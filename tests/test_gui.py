@@ -3,7 +3,6 @@ import pytest
 from PySide6.QtWidgets import QApplication
 from src.animatic.main_window import AnimaticCreator
 
-
 @pytest.fixture
 def app(qtbot):
     test_app = QApplication.instance()
@@ -13,11 +12,18 @@ def app(qtbot):
 
 def test_window_creation(qtbot):
     """
-    Verifies that the main window can be instantiated 
-    and has the correct title.
+    Verifies the window creation, title, and existence of key widgets.
     """
     window = AnimaticCreator()
     qtbot.addWidget(window)
     
-    assert window.windowTitle() == "Animatic Creator"
+
+    assert window.windowTitle() == "Pirates Animatic"
+    
     assert window.acceptDrops() is True
+
+    input_box = window.findChild(object, "InputBox")
+    render_btn = window.findChild(object, "ActionBtn")
+
+    assert input_box is not None, "Duration Input box is missing!"
+    assert render_btn is not None, "Render Button is missing!"
