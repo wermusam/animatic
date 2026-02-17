@@ -6,6 +6,8 @@ from PySide6.QtWidgets import (
     QMainWindow,
     QLabel,
     QWidget,
+    QFileDialog,
+    QHBoxLayout,
     QVBoxLayout,
     QPushButton,
     QLineEdit,
@@ -26,6 +28,7 @@ class AnimaticCreator(QMainWindow):
 
         self.image_path: Optional[str] = None
         self.audio_path: Optional[str] = None
+        self.output_path: Optional[str] = None
         self.engine: AnimaticEngine = AnimaticEngine()
 
         self._setup_ui()
@@ -62,6 +65,18 @@ class AnimaticCreator(QMainWindow):
         self.duration_input.setObjectName("InputBox")
         self.layout.addWidget(self.duration_input)
 
+        self.output_row = QHBoxLayout()
+        self.output_path_input = QLineEdit()
+        self.output_path_input.setPlaceholderText("Save location will appear here...")
+        self.output_path_input.setObjectName("InputBox")
+        self.browse_btn = QPushButton("📁")
+        self.browse_btn.setFixedWidth(40)
+        self.browse_btn.setObjectName("BrowseBtn")
+        self.browse_btn.clicked.connect(self.browse_output_path)
+        self.output_row.addWidget(self.output_path_input)
+        self.output_row.addWidget(self.browse_btn)
+        self.layout.addLayout(self.output_row)
+
         self.render_btn = QPushButton("Generate Animatic")
         self.render_btn.setObjectName("ActionBtn")
         self.render_btn.clicked.connect(self.create_video)
@@ -80,6 +95,13 @@ class AnimaticCreator(QMainWindow):
             ext = os.path.splitext(file_path)[1].lower()
             if ext in [".png", ".jpg", ".jpeg"]:
                 self.image_path = file_path
+                if not self.output_path:
+                    default_name = os.path.splitext(os.path.basename(file_path))[0]
+                    self.output_path_input.setText(
+                        os.path.join(
+                            os.path.dirname(file_path), f"{default_name}_video.mp4"
+                        )
+                    )
                 self.label.setText(f"Loaded Image: {os.path.basename(file_path)}")
                 self.label.setStyleSheet("border-color: #00ff00;")
             elif ext in [".mp3", ".wav", ".m4a"]:
@@ -93,15 +115,27 @@ class AnimaticCreator(QMainWindow):
             aud_name = os.path.basename(self.audio_path) if self.audio_path else "None"
             self.status_label.setText(f"Image: {img_name}  |  Audio: {aud_name}")
 
+    def browse_output_path(self) -> None:
+        """Opens a save dialog so the user can choose where to save the video."""
+        path, _ = QFileDialog.getSaveFileName(
+            self, "Save Video As", "", "MP4 Files (*.mp4)"
+        )
+        if path:
+            self.output_path = path
+            self.output_path_input.setText(path)
+
     def create_video(self) -> None:
         """Handles the UI logic for gathering paths and triggering the render engine."""
         if not self.image_path:
             QMessageBox.warning(self, "Error", "Please drag an image in first!")
             return
 
-        folder: str = os.path.dirname(self.image_path)
-        filename: str = os.path.splitext(os.path.basename(self.image_path))[0]
-        output_path: str = os.path.join(folder, f"{filename}_video.mp4")
+        if self.output_path:
+            output_path = self.output_path
+        else:
+            folder: str = os.path.dirname(self.image_path)
+            filename: str = os.path.splitext(os.path.basename(self.image_path))[0]
+            output_path = os.path.join(folder, f"{filename}_video.mp4")
 
         self.label.setText("Rendering...")
         QApplication.processEvents()
@@ -131,6 +165,7 @@ class AnimaticCreator(QMainWindow):
             QLineEdit#InputBox {{ padding: 10px; border: 2px solid #444; border-radius: 5px; background-color: #2d2d2d; font-size: 16px; color: white; }}
             QPushButton#ActionBtn {{ background-color: {accent_pink}; color: white; border: none; padding: 15px; border-radius: 5px; font-weight: bold; font-size: 16px; }}
             QPushButton#ActionBtn:hover {{ background-color: #ff6688; }}
+            QPushButton#BrowseBtn {{ background-color: #2d2d2d; border: 2px solid #444; border-radius: 5px; font-size: 18px; }}
             QLabel#DropLabel {{ border: 2px dashed {accent_pink}; border-radius: 10px; background-color: #2d2d2d; font-size: 24px; color: #aaa; }}
             QMessageBox {{ background-color: #2d2d2d; }}
             QMessageBox QLabel {{ color: white; }}

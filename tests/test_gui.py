@@ -92,3 +92,55 @@ def test_render_command(mock_subprocess, mock_popup, window):
     assert any("image.png" in arg for arg in command_list)
 
     mock_popup.assert_called_once()
+
+
+def test_drop_image_sets_default_output_path(window):
+    """When an image is dropped, the output path field should auto-populate."""
+    mime_data = QMimeData()
+    fake_url = QUrl.fromLocalFile("C:/fake/path/test_image.png")
+    mime_data.setUrls([fake_url])
+
+    event = QDropEvent(
+        QPointF(0, 0),
+        Qt.DropAction.CopyAction,
+        mime_data,
+        Qt.MouseButton.LeftButton,
+        Qt.KeyboardModifier.NoModifier,
+    )
+
+    window.dropEvent(event)
+
+    assert "test_image_video.mp4" in window.output_path_input.text().replace("\\", "/")
+
+
+def test_browse_sets_output_path(window):
+    """When browse dialog returns a path, it should be stored and shown."""
+    with patch(
+        "main_window.QFileDialog.getSaveFileName",
+        return_value=("C:/chosen/output.mp4", ""),
+    ):
+        window.browse_output_path()
+
+    assert window.output_path == "C:/chosen/output.mp4"
+    assert window.output_path_input.text() == "C:/chosen/output.mp4"
+
+
+def test_existing_output_path_not_overwritten(window):
+    """If user already chose a save path, dropping an image should not overwrite it."""
+    window.output_path = "C:/my/chosen/path.mp4"
+
+    mime_data = QMimeData()
+    fake_url = QUrl.fromLocalFile("C:/fake/path/test_image.png")
+    mime_data.setUrls([fake_url])
+
+    event = QDropEvent(
+        QPointF(0, 0),
+        Qt.DropAction.CopyAction,
+        mime_data,
+        Qt.MouseButton.LeftButton,
+        Qt.KeyboardModifier.NoModifier,
+    )
+
+    window.dropEvent(event)
+
+    assert window.output_path == "C:/my/chosen/path.mp4"
