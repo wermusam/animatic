@@ -1,14 +1,21 @@
+"""Tests for the multi-panel AnimaticCreator GUI."""
+
+import os
 import sys
+import tempfile
 from unittest.mock import patch
+
 import pytest
 from PySide6.QtWidgets import QApplication
 from PySide6.QtCore import QMimeData, QUrl, Qt, QPointF
-from PySide6.QtGui import QDropEvent
-from main_window import AnimaticCreator
+from PySide6.QtGui import QDropEvent, QImage
+
+from animatic.main_window import AnimaticCreator
 
 
 @pytest.fixture
 def app(qtbot):
+    """Ensure a QApplication exists."""
     test_app = QApplication.instance()
     if test_app is None:
         test_app = QApplication(sys.argv)
@@ -17,89 +24,57 @@ def app(qtbot):
 
 @pytest.fixture
 def window(qtbot):
+    """Create a fresh AnimaticCreator window."""
     win = AnimaticCreator()
     qtbot.addWidget(win)
     return win
 
 
-def test_initial_state(window):
-    """Check that variables are empty at start."""
-    assert window.image_path is None
-    assert window.audio_path is None
-    assert "Drag 'n Drop" in window.label.text()
+@pytest.fixture
+def temp_images(tmp_path):
+    """Create small temporary PNG files for testing.
 
-
-def test_drop_image(window):
-    """Simulate dropping an image file."""
-    mime_data = QMimeData()
-    fake_url = QUrl.fromLocalFile("C:/fake/path/test_image.png")
-    mime_data.setUrls([fake_url])
-
-    event = QDropEvent(
-        QPointF(0, 0),
-        Qt.DropAction.CopyAction,
-        mime_data,
-        Qt.MouseButton.LeftButton,
-        Qt.KeyboardModifier.NoModifier,
-    )
-
-    window.dropEvent(event)
-
-    assert window.image_path.replace("\\", "/") == "C:/fake/path/test_image.png"
-    assert "Loaded Image" in window.label.text()
-
-
-def test_drop_audio(window):
-    """Simulate dropping an audio file."""
-    mime_data = QMimeData()
-    fake_url = QUrl.fromLocalFile("C:/fake/path/test_audio.mp3")
-    mime_data.setUrls([fake_url])
-
-    event = QDropEvent(
-        QPointF(0, 0),
-        Qt.DropAction.CopyAction,
-        mime_data,
-        Qt.MouseButton.LeftButton,
-        Qt.KeyboardModifier.NoModifier,
-    )
-
-    window.dropEvent(event)
-
-    assert window.audio_path.replace("\\", "/") == "C:/fake/path/test_audio.mp3"
-    assert "Loaded Audio" in window.label.text()
-
-
-@patch("src.animatic.main_window.QMessageBox.information")
-@patch("subprocess.run")
-def test_render_command(mock_subprocess, mock_popup, window):
+    Returns:
+        A list of 3 image file paths.
     """
-    Verify that the 'Generate' button constructs the correct FFmpeg command
-    WITHOUT actually running FFmpeg OR showing a popup.
+    paths = []
+    for i in range(3):
+        img = QImage(10, 10, QImage.Format.Format_RGB32)
+        img.fill(Qt.GlobalColor.red)
+        path = str(tmp_path / f"panel{i + 1}.png")
+        img.save(path)
+        paths.append(path)
+    return paths
+
+
+@pytest.fixture
+def temp_audio(tmp_path):
+    """Create a temporary audio file path for testing.
+
+    Returns:
+        A path to a fake .mp3 file (empty but exists on disk).
     """
-    window.image_path = "C:/test/image.png"
-    window.audio_path = "C:/test/audio.mp3"
-
-    window.create_video()
-
-    assert mock_subprocess.called
-
-    args, _ = mock_subprocess.call_args
-    command_list = args[0]
-
-    assert "-loop" in command_list
-    assert "-shortest" in command_list
-
-    assert any("image.png" in arg for arg in command_list)
-
-    mock_popup.assert_called_once()
+    path = str(tmp_path / "dialogue.mp3")
+    with open(path, "wb") as f:
+        f.write(b"\x00" * 100)
+    return path
 
 
-def test_drop_image_sets_default_output_path(window):
-    """When an image is dropped, the output path field should auto-populate."""
+def _make_drop_event(file_paths: list[str]) -> tuple[QDropEvent, QMimeData]:
+    """Create a QDropEvent with the given file paths.
+
+    Returns both the event and mime data so the mime data
+    doesn't get garbage collected before dropEvent uses it.
+
+    Args:
+        file_paths: List of file paths to include in the drop.
+
+    Returns:
+        A tuple of (QDropEvent, QMimeData).
+    """
     mime_data = QMimeData()
-    fake_url = QUrl.fromLocalFile("C:/fake/path/test_image.png")
-    mime_data.setUrls([fake_url])
-
+    urls = [QUrl.fromLocalFile(p) for p in file_paths]
+    mime_data.setUrls(urls)
     event = QDropEvent(
         QPointF(0, 0),
         Qt.DropAction.CopyAction,
@@ -107,40 +82,436 @@ def test_drop_image_sets_default_output_path(window):
         Qt.MouseButton.LeftButton,
         Qt.KeyboardModifier.NoModifier,
     )
-
-    window.dropEvent(event)
-
-    assert "test_image_video.mp4" in window.output_path_input.text().replace("\\", "/")
+    return event, mime_data
 
 
-def test_browse_sets_output_path(window):
-    """When browse dialog returns a path, it should be stored and shown."""
-    with patch(
-        "main_window.QFileDialog.getSaveFileName",
-        return_value=("C:/chosen/output.mp4", ""),
-    ):
-        window.browse_output_path()
+class TestInitialState:
+    """Tests for the window's initial state."""
 
-    assert window.output_path == "C:/chosen/output.mp4"
-    assert window.output_path_input.text() == "C:/chosen/output.mp4"
+    def test_empty_project(self, window: AnimaticCreator) -> None:
+        """New window should have an empty project."""
+        assert len(window.project.panels) == 0
+        assert window.project.audio_path is None
+
+    def test_drop_zone_text(self, window: AnimaticCreator) -> None:
+        """Main display should show the drop prompt."""
+        assert "Drop" in window.main_display.text() or "Add Images" in window.main_display.text()
+
+    def test_buttons_disabled(self, window: AnimaticCreator) -> None:
+        """Play, stop, export, remove should be disabled with no panels."""
+        assert not window.play_btn.isEnabled()
+        assert not window.stop_btn.isEnabled()
+        assert not window.export_btn.isEnabled()
+        assert not window.remove_btn.isEnabled()
 
 
-def test_existing_output_path_not_overwritten(window):
-    """If user already chose a save path, dropping an image should not overwrite it."""
-    window.output_path = "C:/my/chosen/path.mp4"
+class TestDropImages:
+    """Tests for dragging and dropping images."""
 
-    mime_data = QMimeData()
-    fake_url = QUrl.fromLocalFile("C:/fake/path/test_image.png")
-    mime_data.setUrls([fake_url])
+    def test_drop_single_image(self, window: AnimaticCreator, temp_images: list[str]) -> None:
+        """Dropping one image should create one panel."""
+        event, _mime = _make_drop_event([temp_images[0]])
+        window.dropEvent(event)
 
-    event = QDropEvent(
-        QPointF(0, 0),
-        Qt.DropAction.CopyAction,
-        mime_data,
-        Qt.MouseButton.LeftButton,
-        Qt.KeyboardModifier.NoModifier,
-    )
+        assert len(window.project.panels) == 1
+        assert window.panel_strip.count() == 1
 
-    window.dropEvent(event)
+    def test_drop_multiple_images(self, window: AnimaticCreator, temp_images: list[str]) -> None:
+        """Dropping multiple images should create a panel for each."""
+        event, _mime = _make_drop_event(temp_images)
+        window.dropEvent(event)
 
-    assert window.output_path == "C:/my/chosen/path.mp4"
+        assert len(window.project.panels) == 3
+        assert window.panel_strip.count() == 3
+
+    def test_drop_image_enables_buttons(self, window: AnimaticCreator, temp_images: list[str]) -> None:
+        """Buttons should be enabled after adding a panel."""
+        event, _mime = _make_drop_event([temp_images[0]])
+        window.dropEvent(event)
+
+        assert window.play_btn.isEnabled()
+        assert window.export_btn.isEnabled()
+
+    def test_drop_sets_default_output_path(self, window: AnimaticCreator, temp_images: list[str]) -> None:
+        """First image drop should auto-populate the output path."""
+        event, _mime = _make_drop_event([temp_images[0]])
+        window.dropEvent(event)
+
+        output_text = window.output_path_input.text()
+        assert "animatic_" in output_text
+        assert output_text.endswith(".mp4")
+
+    def test_existing_output_not_overwritten(self, window: AnimaticCreator, temp_images: list[str]) -> None:
+        """User-set output path should not be overwritten by new drops."""
+        window.output_path_input.setText("C:/my/chosen/path.mp4")
+
+        event, _mime = _make_drop_event([temp_images[0]])
+        window.dropEvent(event)
+
+        assert window.output_path_input.text() == "C:/my/chosen/path.mp4"
+
+    def test_panel_strip_shows_duration(self, window: AnimaticCreator, temp_images: list[str]) -> None:
+        """Panel strip items should show the default duration."""
+        event, _mime = _make_drop_event([temp_images[0]])
+        window.dropEvent(event)
+
+        item = window.panel_strip.item(0)
+        assert "3.0s" in item.text()
+
+
+class TestDropAudio:
+    """Tests for dragging and dropping audio files."""
+
+    def test_drop_audio(self, window: AnimaticCreator, temp_audio: str) -> None:
+        """Dropping audio should set the project audio path."""
+        event, _mime = _make_drop_event([temp_audio])
+        window.dropEvent(event)
+
+        assert window.project.audio_path is not None
+        assert "dialogue.mp3" in window.project.audio_path
+
+    def test_audio_label_updates(self, window: AnimaticCreator, temp_audio: str) -> None:
+        """Audio label should show the filename after drop."""
+        event, _mime = _make_drop_event([temp_audio])
+        window.dropEvent(event)
+
+        assert "dialogue" in window.panel_audio_label.text()
+
+    def test_invalid_file_ignored(self, window: AnimaticCreator, tmp_path) -> None:
+        """Dropping an unsupported file type should not add panels or audio."""
+        txt_path = str(tmp_path / "readme.txt")
+        with open(txt_path, "w") as f:
+            f.write("hello")
+
+        event, _mime = _make_drop_event([txt_path])
+        window.dropEvent(event)
+
+        assert len(window.project.panels) == 0
+        assert window.project.audio_path is None
+
+
+class TestPanelControls:
+    """Tests for panel selection, duration editing, and removal."""
+
+    def test_duration_edit_updates_panel(self, window: AnimaticCreator, temp_images: list[str]) -> None:
+        """Changing the duration spinbox should update the selected panel."""
+        event, _mime = _make_drop_event([temp_images[0]])
+        window.dropEvent(event)
+
+        window.duration_spin.setValue(5.5)
+
+        assert window.project.panels[0].duration == 5.5
+
+    def test_duration_edit_updates_strip_label(self, window: AnimaticCreator, temp_images: list[str]) -> None:
+        """Changing duration should update the strip item text."""
+        event, _mime = _make_drop_event([temp_images[0]])
+        window.dropEvent(event)
+
+        window.duration_spin.setValue(7.0)
+
+        item = window.panel_strip.item(0)
+        assert "7.0s" in item.text()
+
+    def test_remove_panel(self, window: AnimaticCreator, temp_images: list[str]) -> None:
+        """Removing a panel should update both project and strip."""
+        event, _mime = _make_drop_event(temp_images[:2])
+        window.dropEvent(event)
+
+        window.panel_strip.setCurrentRow(0)
+        window._remove_selected_panel()
+
+        assert len(window.project.panels) == 1
+        assert window.panel_strip.count() == 1
+
+    def test_remove_last_panel_disables_buttons(self, window: AnimaticCreator, temp_images: list[str]) -> None:
+        """Removing all panels should disable buttons and show drop text."""
+        event, _mime = _make_drop_event([temp_images[0]])
+        window.dropEvent(event)
+
+        window._remove_selected_panel()
+
+        assert not window.play_btn.isEnabled()
+        assert not window.export_btn.isEnabled()
+        assert "Drop" in window.main_display.text() or "Add Images" in window.main_display.text()
+
+    def test_total_duration_label(self, window: AnimaticCreator, temp_images: list[str]) -> None:
+        """Total duration label should reflect all panel durations."""
+        event, _mime = _make_drop_event(temp_images[:2])
+        window.dropEvent(event)
+
+        assert "6.0s" in window.total_label.text()
+        assert "2 panels" in window.total_label.text()
+
+
+class TestExport:
+    """Tests for the export workflow."""
+
+    @patch("animatic.main_window.QMessageBox.information")
+    def test_export_calls_engine(
+        self, mock_popup, window: AnimaticCreator, temp_images: list[str]
+    ) -> None:
+        """Export should invoke FFmpeg via background thread."""
+        event, _mime = _make_drop_event(temp_images[:2])
+        window.dropEvent(event)
+        window.output_path_input.setText("C:/fake/output.mp4")
+
+        with patch.object(window.engine, "generate_multi_panel_video") as mock_gen:
+            window._export_video()
+            window._export_thread.wait()
+            QApplication.processEvents()
+
+            mock_gen.assert_called_once()
+            kwargs = mock_gen.call_args.kwargs
+            assert len(kwargs["panels"]) == 2
+            assert kwargs["output_path"] == "C:/fake/output.mp4"
+
+    def test_export_no_panels_warns(self, window: AnimaticCreator) -> None:
+        """Export with no panels should show a warning."""
+        with patch("animatic.main_window.QMessageBox.warning") as mock_warn:
+            window._export_video()
+            mock_warn.assert_called_once()
+
+
+class TestBrowse:
+    """Tests for the browse output path dialog."""
+
+    def test_browse_sets_output_path(self, window: AnimaticCreator) -> None:
+        """Browse dialog result should update the output path."""
+        with patch(
+            "animatic.main_window.QFileDialog.getSaveFileName",
+            return_value=("C:/chosen/output.mp4", ""),
+        ):
+            window.browse_output_path()
+
+        assert window.project.output_path == "C:/chosen/output.mp4"
+        assert window.output_path_input.text() == "C:/chosen/output.mp4"
+
+
+class TestPanelNotes:
+    """Tests for panel notes/dialogue."""
+
+    def test_notes_input_updates_panel(self, window: AnimaticCreator, temp_images: list[str]) -> None:
+        """Typing in the notes field should update the panel's notes."""
+        event, _mime = _make_drop_event([temp_images[0]])
+        window.dropEvent(event)
+
+        window.notes_input.setText("Hero enters the cave")
+        assert window.project.panels[0].notes == "Hero enters the cave"
+
+    def test_notes_populated_on_select(self, window: AnimaticCreator, temp_images: list[str]) -> None:
+        """Selecting a panel should populate the notes field."""
+        event, _mime = _make_drop_event(temp_images[:2])
+        window.dropEvent(event)
+
+        window.project.panels[0].notes = "Panel one notes"
+        window.project.panels[1].notes = "Panel two notes"
+
+        window.panel_strip.setCurrentRow(0)
+        assert window.notes_input.text() == "Panel one notes"
+
+        window.panel_strip.setCurrentRow(1)
+        assert window.notes_input.text() == "Panel two notes"
+
+
+class TestRemoveAudio:
+    """Tests for removing audio from a panel."""
+
+    def test_remove_audio_clears_panel(self, window: AnimaticCreator, temp_images: list[str], temp_audio: str) -> None:
+        """Remove audio button should clear the panel's audio path."""
+        event, _mime = _make_drop_event([temp_images[0]])
+        window.dropEvent(event)
+
+        # Set audio on the panel
+        audio_event, _audio_mime = _make_drop_event([temp_audio])
+        window.dropEvent(audio_event)
+        assert window.project.panels[0].audio_path is not None
+
+        window._remove_panel_audio()
+        assert window.project.panels[0].audio_path is None
+        assert "None" in window.panel_audio_label.text()
+
+    def test_remove_audio_button_disabled_when_no_audio(self, window: AnimaticCreator, temp_images: list[str]) -> None:
+        """Remove audio button should be disabled when panel has no audio."""
+        event, _mime = _make_drop_event([temp_images[0]])
+        window.dropEvent(event)
+        assert not window.remove_audio_btn.isEnabled()
+
+
+class TestDuplicate:
+    """Tests for panel duplication."""
+
+    def test_duplicate_adds_panel(self, window: AnimaticCreator, temp_images: list[str]) -> None:
+        """Duplicating should add a new panel to project and strip."""
+        event, _mime = _make_drop_event([temp_images[0]])
+        window.dropEvent(event)
+
+        window._duplicate_selected_panel()
+
+        assert len(window.project.panels) == 2
+        assert window.panel_strip.count() == 2
+        assert window.project.panels[0].image_path == window.project.panels[1].image_path
+
+    def test_duplicate_preserves_duration(self, window: AnimaticCreator, temp_images: list[str]) -> None:
+        """Duplicated panel should have the same duration."""
+        event, _mime = _make_drop_event([temp_images[0]])
+        window.dropEvent(event)
+        window.duration_spin.setValue(7.5)
+
+        window._duplicate_selected_panel()
+        assert window.project.panels[1].duration == 7.5
+
+    def test_duplicate_inserts_after_selected(self, window: AnimaticCreator, temp_images: list[str]) -> None:
+        """Duplicate should insert after the selected panel, not at the end."""
+        event, _mime = _make_drop_event(temp_images[:2])
+        window.dropEvent(event)
+
+        window.panel_strip.setCurrentRow(0)
+        window._duplicate_selected_panel()
+
+        assert len(window.project.panels) == 3
+        assert window.project.panels[0].image_path == window.project.panels[1].image_path
+
+    def test_duplicate_updates_total(self, window: AnimaticCreator, temp_images: list[str]) -> None:
+        """Total duration should update after duplication."""
+        event, _mime = _make_drop_event([temp_images[0]])
+        window.dropEvent(event)
+
+        window._duplicate_selected_panel()
+        assert "6.0s" in window.total_label.text()
+
+
+class TestSaveLoad:
+    """Tests for project save/load."""
+
+    def test_save_creates_file(self, window: AnimaticCreator, temp_images: list[str], tmp_path) -> None:
+        """Saving should create an .animatic file."""
+        event, _mime = _make_drop_event(temp_images[:2])
+        window.dropEvent(event)
+        window.project.panels[0].notes = "Test note"
+
+        path = str(tmp_path / "test.animatic")
+        with patch(
+            "animatic.main_window.QFileDialog.getSaveFileName",
+            return_value=(path, ""),
+        ):
+            window._save_project()
+
+        assert os.path.exists(path)
+
+    def test_load_restores_panels(self, window: AnimaticCreator, temp_images: list[str], tmp_path) -> None:
+        """Loading should restore panels into the UI."""
+        # Create and save a project
+        event, _mime = _make_drop_event(temp_images[:2])
+        window.dropEvent(event)
+        window.project.panels[0].notes = "Restored note"
+
+        path = str(tmp_path / "test.animatic")
+        window.project.save(path)
+
+        # Create a fresh window and load
+        fresh = AnimaticCreator()
+        fresh._load_project(path)
+
+        assert len(fresh.project.panels) == 2
+        assert fresh.panel_strip.count() == 2
+        assert fresh.project.panels[0].notes == "Restored note"
+
+    def test_drop_animatic_file(self, window: AnimaticCreator, temp_images: list[str], tmp_path) -> None:
+        """Dropping an .animatic file should load the project."""
+        # Save a project first
+        event, _mime = _make_drop_event(temp_images[:2])
+        window.dropEvent(event)
+        path = str(tmp_path / "test.animatic")
+        window.project.save(path)
+
+        # Drop the .animatic file onto a fresh window
+        fresh = AnimaticCreator()
+        drop_event, _drop_mime = _make_drop_event([path])
+        fresh.dropEvent(drop_event)
+
+        assert len(fresh.project.panels) == 2
+        assert fresh.panel_strip.count() == 2
+
+
+class TestReorder:
+    """Tests for keyboard reordering with Ctrl+Left/Right."""
+
+    def test_move_panel_left(self, window: AnimaticCreator, temp_images: list[str]) -> None:
+        """Ctrl+Left should move the selected panel left."""
+        event, _mime = _make_drop_event(temp_images[:3])
+        window.dropEvent(event)
+
+        window.panel_strip.setCurrentRow(2)
+        original_id = window.project.panels[2].panel_id
+        window._move_panel_left()
+
+        assert window.project.panels[1].panel_id == original_id
+        assert window.panel_strip.currentRow() == 1
+
+    def test_move_panel_right(self, window: AnimaticCreator, temp_images: list[str]) -> None:
+        """Ctrl+Right should move the selected panel right."""
+        event, _mime = _make_drop_event(temp_images[:3])
+        window.dropEvent(event)
+
+        window.panel_strip.setCurrentRow(0)
+        original_id = window.project.panels[0].panel_id
+        window._move_panel_right()
+
+        assert window.project.panels[1].panel_id == original_id
+        assert window.panel_strip.currentRow() == 1
+
+    def test_move_first_panel_left_noop(self, window: AnimaticCreator, temp_images: list[str]) -> None:
+        """Moving the first panel left should be a no-op."""
+        event, _mime = _make_drop_event(temp_images[:2])
+        window.dropEvent(event)
+
+        window.panel_strip.setCurrentRow(0)
+        original_order = [p.panel_id for p in window.project.panels]
+        window._move_panel_left()
+
+        assert [p.panel_id for p in window.project.panels] == original_order
+
+    def test_move_last_panel_right_noop(self, window: AnimaticCreator, temp_images: list[str]) -> None:
+        """Moving the last panel right should be a no-op."""
+        event, _mime = _make_drop_event(temp_images[:2])
+        window.dropEvent(event)
+
+        window.panel_strip.setCurrentRow(1)
+        original_order = [p.panel_id for p in window.project.panels]
+        window._move_panel_right()
+
+        assert [p.panel_id for p in window.project.panels] == original_order
+
+
+class TestKeyboard:
+    """Tests for keyboard shortcuts."""
+
+    def test_space_toggles_playback(self, window: AnimaticCreator, temp_images: list[str]) -> None:
+        """Space key should toggle play/pause."""
+        event, _mime = _make_drop_event([temp_images[0]])
+        window.dropEvent(event)
+
+        from PySide6.QtGui import QKeyEvent
+        from PySide6.QtCore import QEvent
+
+        key_event = QKeyEvent(QEvent.Type.KeyPress, Qt.Key.Key_Space, Qt.KeyboardModifier.NoModifier)
+        window.eventFilter(window, key_event)
+
+        assert window.play_btn.text() == "Pause"
+
+    def test_arrow_keys_navigate_panels(self, window: AnimaticCreator, temp_images: list[str]) -> None:
+        """Left/Right arrow keys should navigate between panels without loading the player."""
+        event, _mime = _make_drop_event(temp_images[:2])
+        window.dropEvent(event)
+        assert window.panel_strip.currentRow() == 1  # last added is selected
+
+        from PySide6.QtGui import QKeyEvent
+        from PySide6.QtCore import QEvent
+
+        left = QKeyEvent(QEvent.Type.KeyPress, Qt.Key.Key_Left, Qt.KeyboardModifier.NoModifier)
+        window.eventFilter(window, left)
+        assert window.panel_strip.currentRow() == 0
+
+        right = QKeyEvent(QEvent.Type.KeyPress, Qt.Key.Key_Right, Qt.KeyboardModifier.NoModifier)
+        window.eventFilter(window, right)
+        assert window.panel_strip.currentRow() == 1

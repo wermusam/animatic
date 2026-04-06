@@ -1,22 +1,27 @@
 [project]
 name = "animatic"
 version = "0.1.0"
-description = "Add your description here"
+description = "A free, fast storyboard animatic tool. Drag images, add audio, preview instantly, export video."
 readme = "README.md"
 requires-python = ">=3.13"
 dependencies = [
     "imageio-ffmpeg>=0.6.0",
-    "moviepy>=2.2.1",
     "pyside6>=6.10.2",
-    "pytest>=9.0.2",
 ]
+
+[project.scripts]
+animatic = "animatic.main_window:main"
+
+[project.gui-scripts]
+animatic = "animatic.main_window:main"
 
 [dependency-groups]
 dev = [
+    "pytest>=9.0.2",
     "pytest-qt>=4.5.0",
     "ruff>=0.15.1",
 ]
 
 [tool.pytest.ini_options]
-pythonpath = "src/animatic"
+pythonpath = ["src"]
 testpaths = ["tests"]
