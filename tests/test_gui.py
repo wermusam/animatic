@@ -6,7 +6,7 @@ import tempfile
 from unittest.mock import patch, MagicMock
 
 import pytest
-from PySide6.QtWidgets import QApplication
+from PySide6.QtWidgets import QApplication, QMessageBox
 from PySide6.QtCore import QMimeData, QUrl, Qt, QPointF, QEvent
 from PySide6.QtGui import QDropEvent, QImage, QKeyEvent
 
@@ -771,3 +771,83 @@ class TestKeyboardCtrl:
         window.eventFilter(window, key)
 
         assert len(window.project.panels) == 2
+
+
+class TestBugFixes:
+    """Tests for the 4 reliability bug fixes."""
+
+    def test_preview_panel_changed_updates_notes(
+        self, window: AnimaticCreator, temp_images: list[str]
+    ) -> None:
+        """Bug 1: notes_input should update when preview advances panels."""
+        event, _mime = _make_drop_event(temp_images[:2])
+        window.dropEvent(event)
+
+        window.project.panels[0].notes = "Panel one notes"
+        window.project.panels[1].notes = "Panel two notes"
+
+        # Simulate preview advancing to panel index 1
+        window._on_preview_panel_changed(1)
+        assert window.notes_input.text() == "Panel two notes"
+
+        # Advance back to panel 0
+        window._on_preview_panel_changed(0)
+        assert window.notes_input.text() == "Panel one notes"
+
+    def test_drag_reorder_pushes_undo(
+        self, window: AnimaticCreator, temp_images: list[str]
+    ) -> None:
+        """Bug 2: reordering panels via drag should push to undo stack."""
+        event, _mime = _make_drop_event(temp_images[:2])
+        window.dropEvent(event)
+
+        undo_len_before = len(window._undo_stack._undo)
+
+        # Simulate a drag reorder by swapping strip items and calling sync
+        item0 = window.panel_strip.takeItem(0)
+        window.panel_strip.insertItem(1, item0)
+        window._sync_panel_order()
+
+        assert len(window._undo_stack._undo) == undo_len_before + 1
+
+    def test_per_panel_audio_warns_about_global(
+        self, window: AnimaticCreator, temp_images: list[str], temp_audio: str
+    ) -> None:
+        """Bug 3: setting per-panel audio when global audio exists should warn."""
+        event, _mime = _make_drop_event([temp_images[0]])
+        window.dropEvent(event)
+
+        # Set global audio
+        window.project.audio_path = "/fake/global.mp3"
+
+        # Select the panel
+        window.panel_strip.setCurrentRow(0)
+
+        # Mock both QMessageBox.information and get_audio_duration
+        with patch("animatic.main_window.QMessageBox.information") as mock_info, \
+             patch.object(window.engine, "get_audio_duration", return_value=2.0):
+            window._set_audio(temp_audio)
+            mock_info.assert_called_once()
+            assert "global audio" in mock_info.call_args[0][2].lower()
+
+    def test_export_confirms_overwrite(
+        self, window: AnimaticCreator, temp_images: list[str], tmp_path
+    ) -> None:
+        """Bug 4: exporting to existing file should ask for confirmation."""
+        event, _mime = _make_drop_event([temp_images[0]])
+        window.dropEvent(event)
+
+        # Create a file that already exists
+        output = str(tmp_path / "output.mp4")
+        with open(output, "w") as f:
+            f.write("existing")
+        window.output_path_input.setText(output)
+
+        # User clicks No — export should abort
+        with patch("animatic.main_window.QMessageBox.question",
+                    return_value=QMessageBox.StandardButton.No) as mock_q:
+            window._export_video()
+            mock_q.assert_called_once()
+
+        # export_btn should still be enabled (export was cancelled)
+        assert window.export_btn.isEnabled()

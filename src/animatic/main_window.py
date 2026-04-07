@@ -553,6 +553,7 @@ class AnimaticCreator(QMainWindow):
             pid = item.data(Qt.ItemDataRole.UserRole)
             if pid in panel_map:
                 new_panels.append(panel_map[pid])
+        self._undo_stack.push(self.project)
         self.project.panels = new_panels
 
     def _on_duration_changed(self, value: float) -> None:
@@ -666,6 +667,9 @@ class AnimaticCreator(QMainWindow):
             panel = self.project.panels[index]
             self._show_panel_image(panel, self.player.total_elapsed())
             self.panel_strip.setCurrentRow(index)
+            self.notes_input.blockSignals(True)
+            self.notes_input.setText(panel.notes)
+            self.notes_input.blockSignals(False)
 
     def _on_preview_position(self, elapsed: float) -> None:
         """Update status bar and scrub slider during preview playback."""
@@ -979,6 +983,16 @@ class AnimaticCreator(QMainWindow):
             output_path = self._generate_output_path()
             self.output_path_input.setText(output_path)
 
+        if os.path.exists(output_path):
+            reply = QMessageBox.question(
+                self,
+                "File Exists",
+                f"Overwrite existing file?\n{output_path}",
+                QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
+            )
+            if reply == QMessageBox.StandardButton.No:
+                return
+
         self.export_btn.setEnabled(False)
         self.export_btn.setText("Exporting...")
         self.export_progress.setValue(0)
@@ -1069,6 +1083,12 @@ class AnimaticCreator(QMainWindow):
             return
 
         panel.audio_path = path
+        if self.project.audio_path:
+            QMessageBox.information(
+                self,
+                "Audio Note",
+                "Per-panel audio will be used instead of the global audio track during export.",
+            )
         name = os.path.basename(path)
         duration = self.engine.get_audio_duration(path)
 
