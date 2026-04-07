@@ -172,3 +172,66 @@ class TestPlayerNavigation:
         player.load(sample_panels)
         player.prev_panel()
         assert player.current_index() == 0
+
+
+class TestSeekToTime:
+    """Tests for seek_to_time time-to-panel mapping."""
+
+    def test_seek_to_start(self, player: PreviewPlayer) -> None:
+        """Seeking to 0.0 should land on the first panel."""
+        panels = [
+            Panel(image_path="/tmp/a.png", duration=3.0),
+            Panel(image_path="/tmp/b.png", duration=4.0),
+        ]
+        player.load(panels)
+        player.seek_to_time(0.0)
+        assert player.current_index() == 0
+        assert abs(player.total_elapsed()) < 0.01
+
+    def test_seek_to_second_panel(self, player: PreviewPlayer) -> None:
+        """Seeking past first panel's duration should land on second panel."""
+        panels = [
+            Panel(image_path="/tmp/a.png", duration=3.0),
+            Panel(image_path="/tmp/b.png", duration=4.0),
+            Panel(image_path="/tmp/c.png", duration=2.0),
+        ]
+        player.load(panels)
+        player.seek_to_time(4.0)
+        assert player.current_index() == 1
+        assert abs(player.total_elapsed() - 4.0) < 0.01
+
+    def test_seek_to_last_panel(self, player: PreviewPlayer) -> None:
+        """Seeking near the end should land on the last panel."""
+        panels = [
+            Panel(image_path="/tmp/a.png", duration=2.0),
+            Panel(image_path="/tmp/b.png", duration=2.0),
+            Panel(image_path="/tmp/c.png", duration=2.0),
+        ]
+        player.load(panels)
+        player.seek_to_time(5.5)
+        assert player.current_index() == 2
+
+    def test_seek_beyond_total_lands_on_last(self, player: PreviewPlayer) -> None:
+        """Seeking past the total duration should land on the last panel."""
+        panels = [
+            Panel(image_path="/tmp/a.png", duration=2.0),
+            Panel(image_path="/tmp/b.png", duration=3.0),
+        ]
+        player.load(panels)
+        player.seek_to_time(100.0)
+        assert player.current_index() == len(panels) - 1
+
+    def test_seek_emits_panel_changed(self, player: PreviewPlayer, qtbot) -> None:
+        """seek_to_time should emit panel_changed signal."""
+        panels = [
+            Panel(image_path="/tmp/a.png", duration=3.0),
+            Panel(image_path="/tmp/b.png", duration=3.0),
+        ]
+        player.load(panels)
+        with qtbot.waitSignal(player.panel_changed, timeout=1000):
+            player.seek_to_time(4.0)
+
+    def test_seek_on_empty_is_noop(self, player: PreviewPlayer) -> None:
+        """Seeking with no panels loaded should not crash."""
+        player.seek_to_time(5.0)
+        assert player.current_index() == 0

@@ -3,12 +3,12 @@
 import os
 import sys
 import tempfile
-from unittest.mock import patch
+from unittest.mock import patch, MagicMock
 
 import pytest
 from PySide6.QtWidgets import QApplication
-from PySide6.QtCore import QMimeData, QUrl, Qt, QPointF
-from PySide6.QtGui import QDropEvent, QImage
+from PySide6.QtCore import QMimeData, QUrl, Qt, QPointF, QEvent
+from PySide6.QtGui import QDropEvent, QImage, QKeyEvent
 
 from animatic.main_window import AnimaticCreator
 
@@ -515,3 +515,260 @@ class TestKeyboard:
         right = QKeyEvent(QEvent.Type.KeyPress, Qt.Key.Key_Right, Qt.KeyboardModifier.NoModifier)
         window.eventFilter(window, right)
         assert window.panel_strip.currentRow() == 1
+
+
+class TestScrubBar:
+    """Tests for scrub bar interactions."""
+
+    def test_scrub_value_shows_correct_panel(self, window: AnimaticCreator, temp_images: list[str]) -> None:
+        """Moving scrub bar to midpoint should update timecode display."""
+        event, _mime = _make_drop_event(temp_images[:2])
+        window.dropEvent(event)
+
+        # Panels are 3.0s each = 6.0s total. Slider at 500 = 3.0s = start of panel 2.
+        window.scrub_slider.setValue(500)
+        QApplication.processEvents()
+
+        # Timecode should reflect ~3.0s
+        assert "3" in window.timecode_label.text()
+
+    def test_scrub_to_zero(self, window: AnimaticCreator, temp_images: list[str]) -> None:
+        """Scrub bar at 0 should show the beginning."""
+        event, _mime = _make_drop_event(temp_images[:2])
+        window.dropEvent(event)
+
+        window.scrub_slider.setValue(0)
+        QApplication.processEvents()
+
+        assert "0:00.0" in window.timecode_label.text()
+
+    def test_scrub_pressed_pauses_playback(self, window: AnimaticCreator, temp_images: list[str]) -> None:
+        """Pressing the scrub bar while playing should pause."""
+        event, _mime = _make_drop_event(temp_images[:2])
+        window.dropEvent(event)
+
+        window._toggle_playback()
+        assert window.player.is_playing()
+
+        window._on_scrub_pressed()
+        assert not window.player.is_playing()
+        assert window._scrubbing
+
+    def test_scrub_released_resumes_playback(self, window: AnimaticCreator, temp_images: list[str]) -> None:
+        """Releasing the scrub bar should resume if was playing before."""
+        event, _mime = _make_drop_event(temp_images[:2])
+        window.dropEvent(event)
+
+        window._toggle_playback()
+        window._on_scrub_pressed()
+        window._on_scrub_released()
+
+        assert not window._scrubbing
+        assert window.player.is_playing()
+
+
+class TestExportFailure:
+    """Tests for the export error path."""
+
+    @patch("animatic.main_window.QMessageBox.critical")
+    def test_export_error_shows_dialog(
+        self, mock_critical, window: AnimaticCreator, temp_images: list[str]
+    ) -> None:
+        """Export failure should show a critical error dialog and re-enable button."""
+        event, _mime = _make_drop_event(temp_images[:1])
+        window.dropEvent(event)
+        window.output_path_input.setText("/tmp/out.mp4")
+
+        with patch.object(
+            window.engine, "generate_multi_panel_video",
+            side_effect=Exception("ffmpeg crashed"),
+        ):
+            window._export_video()
+            window._export_thread.wait()
+            QApplication.processEvents()
+
+            mock_critical.assert_called_once()
+            assert "ffmpeg crashed" in mock_critical.call_args[0][2]
+
+        assert window.export_btn.isEnabled()
+        assert window.export_btn.text() == "Export Video"
+
+    def test_export_success_restores_button(
+        self, window: AnimaticCreator, temp_images: list[str]
+    ) -> None:
+        """After successful export, button should be re-enabled with original text."""
+        event, _mime = _make_drop_event(temp_images[:1])
+        window.dropEvent(event)
+
+        # Simulate the success callback directly (avoids thread timing issues)
+        window.export_btn.setEnabled(False)
+        window.export_btn.setText("Exporting...")
+
+        with patch("animatic.main_window.QMessageBox.information"):
+            window._on_export_success("/tmp/out.mp4")
+
+        assert window.export_btn.isEnabled()
+        assert window.export_btn.text() == "Export Video"
+
+
+class TestBrowseDialogs:
+    """Tests for file browse dialogs."""
+
+    def test_browse_images_adds_panels(self, window: AnimaticCreator, temp_images: list[str]) -> None:
+        """Browse images dialog should add panels to the project."""
+        with patch(
+            "animatic.main_window.QFileDialog.getOpenFileNames",
+            return_value=(temp_images[:2], ""),
+        ):
+            window._browse_images()
+
+        assert len(window.project.panels) == 2
+        assert window.panel_strip.count() == 2
+
+    def test_browse_images_cancelled(self, window: AnimaticCreator) -> None:
+        """Cancelling browse images should not add panels."""
+        with patch(
+            "animatic.main_window.QFileDialog.getOpenFileNames",
+            return_value=([], ""),
+        ):
+            window._browse_images()
+
+        assert len(window.project.panels) == 0
+
+    def test_browse_audio_sets_panel_audio(
+        self, window: AnimaticCreator, temp_images: list[str], temp_audio: str
+    ) -> None:
+        """Browse audio should assign audio to the selected panel."""
+        event, _mime = _make_drop_event([temp_images[0]])
+        window.dropEvent(event)
+
+        with patch(
+            "animatic.main_window.QFileDialog.getOpenFileName",
+            return_value=(temp_audio, ""),
+        ), patch.object(window.engine, "get_audio_duration", return_value=None):
+            window._browse_audio()
+
+        assert window.project.panels[0].audio_path == temp_audio
+
+    def test_browse_audio_cancelled(
+        self, window: AnimaticCreator, temp_images: list[str]
+    ) -> None:
+        """Cancelling browse audio should not change anything."""
+        event, _mime = _make_drop_event([temp_images[0]])
+        window.dropEvent(event)
+
+        with patch(
+            "animatic.main_window.QFileDialog.getOpenFileName",
+            return_value=("", ""),
+        ):
+            window._browse_audio()
+
+        assert window.project.panels[0].audio_path is None
+
+
+class TestSetAudioDuration:
+    """Tests for _set_audio auto-duration detection."""
+
+    def test_set_audio_updates_duration(
+        self, window: AnimaticCreator, temp_images: list[str], temp_audio: str
+    ) -> None:
+        """Setting audio with a detectable duration should update the panel duration."""
+        event, _mime = _make_drop_event([temp_images[0]])
+        window.dropEvent(event)
+
+        with patch.object(window.engine, "get_audio_duration", return_value=7.3):
+            window._set_audio(temp_audio)
+
+        assert window.project.panels[0].duration == 7.3
+        assert window.project.panels[0].audio_path == temp_audio
+        assert "7.3" in window.panel_audio_label.text()
+
+    def test_set_audio_no_duration_keeps_default(
+        self, window: AnimaticCreator, temp_images: list[str], temp_audio: str
+    ) -> None:
+        """When duration can't be detected, panel duration should remain unchanged."""
+        event, _mime = _make_drop_event([temp_images[0]])
+        window.dropEvent(event)
+
+        with patch.object(window.engine, "get_audio_duration", return_value=None):
+            window._set_audio(temp_audio)
+
+        assert window.project.panels[0].duration == 3.0  # default
+        assert window.project.panels[0].audio_path == temp_audio
+
+    def test_set_audio_no_panel_sets_global(
+        self, window: AnimaticCreator, temp_audio: str
+    ) -> None:
+        """Setting audio with no panel selected should set global audio."""
+        window._set_audio(temp_audio)
+        assert window.project.audio_path == temp_audio
+
+
+class TestDragReorderSync:
+    """Tests for _sync_panel_order after drag-and-drop reorder."""
+
+    def test_sync_reorders_project_panels(
+        self, window: AnimaticCreator, temp_images: list[str]
+    ) -> None:
+        """_sync_panel_order should match project.panels to the strip's visual order."""
+        event, _mime = _make_drop_event(temp_images[:3])
+        window.dropEvent(event)
+
+        original_ids = [p.panel_id for p in window.project.panels]
+        assert len(original_ids) == 3
+
+        # Manually swap items in the strip to simulate drag (move last to first)
+        item = window.panel_strip.takeItem(2)
+        window.panel_strip.insertItem(0, item)
+
+        # Trigger sync
+        window._sync_panel_order()
+
+        new_ids = [p.panel_id for p in window.project.panels]
+        assert new_ids[0] == original_ids[2]
+        assert new_ids[1] == original_ids[0]
+        assert new_ids[2] == original_ids[1]
+
+    def test_sync_preserves_panel_data(
+        self, window: AnimaticCreator, temp_images: list[str]
+    ) -> None:
+        """Reordering should preserve all panel attributes."""
+        event, _mime = _make_drop_event(temp_images[:2])
+        window.dropEvent(event)
+
+        window.project.panels[0].notes = "First panel"
+        window.project.panels[0].duration = 5.0
+        window.project.panels[1].notes = "Second panel"
+
+        # Swap in strip
+        item = window.panel_strip.takeItem(1)
+        window.panel_strip.insertItem(0, item)
+        window._sync_panel_order()
+
+        assert window.project.panels[0].notes == "Second panel"
+        assert window.project.panels[1].notes == "First panel"
+        assert window.project.panels[1].duration == 5.0
+
+
+class TestKeyboardCtrl:
+    """Tests for Ctrl+ keyboard shortcuts."""
+
+    def test_ctrl_s_saves_project(self, window: AnimaticCreator, temp_images: list[str]) -> None:
+        """Ctrl+S should trigger save dialog."""
+        event, _mime = _make_drop_event([temp_images[0]])
+        window.dropEvent(event)
+
+        with patch("animatic.main_window.QFileDialog.getSaveFileName", return_value=("", "")) as mock_save:
+            key = QKeyEvent(QEvent.Type.KeyPress, Qt.Key.Key_S, Qt.KeyboardModifier.ControlModifier)
+            window.eventFilter(window, key)
+            mock_save.assert_called_once()
+
+    def test_ctrl_d_duplicates_panel(self, window: AnimaticCreator, temp_images: list[str]) -> None:
+        """Ctrl+D should duplicate the selected panel."""
+        event, _mime = _make_drop_event([temp_images[0]])
+        window.dropEvent(event)
+
+        key = QKeyEvent(QEvent.Type.KeyPress, Qt.Key.Key_D, Qt.KeyboardModifier.ControlModifier)
+        window.eventFilter(window, key)
+
+        assert len(window.project.panels) == 2

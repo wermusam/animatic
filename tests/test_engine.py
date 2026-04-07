@@ -3,6 +3,9 @@
 Tests verify command structure without invoking FFmpeg.
 """
 
+import subprocess
+from unittest.mock import patch
+
 import pytest
 
 from animatic.engine import AnimaticEngine
@@ -114,6 +117,102 @@ class TestBuildMultiPanelCmd:
 
         assert "1.5" in cmd
         assert "7.0" in cmd
+
+
+class TestPerPanelAudio:
+    """Tests for _build_multi_panel_cmd with per-panel audio."""
+
+    def test_single_panel_with_panel_audio(self, engine: AnimaticEngine) -> None:
+        """Panel with its own audio should use concat with audio streams."""
+        panel = Panel(image_path="/tmp/img.png", duration=5.0)
+        panel.audio_path = "/tmp/voice.mp3"
+        cmd = engine._build_multi_panel_cmd([panel], "/tmp/out.mp4", audio_path=None)
+
+        filter_str = cmd[cmd.index("-filter_complex") + 1]
+        assert "concat=n=1:v=1:a=1" in filter_str
+        assert "/tmp/voice.mp3" in cmd
+        assert "-c:a" in cmd
+        assert "aac" in cmd
+        # Should NOT have -shortest (that's for global audio)
+        assert "-shortest" not in cmd
+
+    def test_mixed_panels_some_with_audio(self, engine: AnimaticEngine) -> None:
+        """Panels without audio should get silence when others have audio."""
+        p1 = Panel(image_path="/tmp/a.png", duration=3.0)
+        p1.audio_path = "/tmp/voice1.mp3"
+        p2 = Panel(image_path="/tmp/b.png", duration=2.0)
+        # p2 has no audio — should get anullsrc silence
+        cmd = engine._build_multi_panel_cmd([p1, p2], "/tmp/out.mp4", audio_path=None)
+
+        filter_str = cmd[cmd.index("-filter_complex") + 1]
+        assert "concat=n=2:v=1:a=1" in filter_str
+        assert "anullsrc" in filter_str
+        assert "/tmp/voice1.mp3" in cmd
+
+    def test_per_panel_audio_overrides_global(self, engine: AnimaticEngine) -> None:
+        """When panels have per-panel audio, global audio_path should be ignored."""
+        panel = Panel(image_path="/tmp/img.png", duration=5.0)
+        panel.audio_path = "/tmp/voice.mp3"
+        cmd = engine._build_multi_panel_cmd(
+            [panel], "/tmp/out.mp4", audio_path="/tmp/global.mp3"
+        )
+
+        # Global audio should NOT appear in the command
+        assert "/tmp/global.mp3" not in cmd
+        assert "/tmp/voice.mp3" in cmd
+
+    def test_all_panels_with_audio(self, engine: AnimaticEngine) -> None:
+        """All panels with audio should produce atrim filters for each."""
+        p1 = Panel(image_path="/tmp/a.png", duration=2.0)
+        p1.audio_path = "/tmp/v1.mp3"
+        p2 = Panel(image_path="/tmp/b.png", duration=3.0)
+        p2.audio_path = "/tmp/v2.mp3"
+        cmd = engine._build_multi_panel_cmd([p1, p2], "/tmp/out.mp4", audio_path=None)
+
+        filter_str = cmd[cmd.index("-filter_complex") + 1]
+        assert "atrim" in filter_str
+        assert "anullsrc" not in filter_str
+        assert "/tmp/v1.mp3" in cmd
+        assert "/tmp/v2.mp3" in cmd
+
+
+class TestGetAudioDuration:
+    """Tests for get_audio_duration stderr parsing."""
+
+    def test_parses_duration(self, engine: AnimaticEngine) -> None:
+        """Should parse HH:MM:SS.ss format from ffmpeg stderr."""
+        fake_stderr = "  Duration: 00:01:23.45, start: 0.000000, bitrate: 128 kb/s"
+        with patch("subprocess.run") as mock_run:
+            mock_run.return_value.stderr = fake_stderr
+            result = engine.get_audio_duration("/tmp/test.mp3")
+
+        assert result is not None
+        assert abs(result - 83.45) < 0.01
+
+    def test_parses_short_duration(self, engine: AnimaticEngine) -> None:
+        """Should handle durations under a minute."""
+        fake_stderr = "  Duration: 00:00:05.20, start: 0.000000"
+        with patch("subprocess.run") as mock_run:
+            mock_run.return_value.stderr = fake_stderr
+            result = engine.get_audio_duration("/tmp/test.mp3")
+
+        assert result is not None
+        assert abs(result - 5.2) < 0.01
+
+    def test_returns_none_on_missing_duration(self, engine: AnimaticEngine) -> None:
+        """Should return None when stderr has no Duration line."""
+        with patch("subprocess.run") as mock_run:
+            mock_run.return_value.stderr = "some other output"
+            result = engine.get_audio_duration("/tmp/test.mp3")
+
+        assert result is None
+
+    def test_returns_none_on_subprocess_error(self, engine: AnimaticEngine) -> None:
+        """Should return None when subprocess raises an error."""
+        with patch("subprocess.run", side_effect=subprocess.SubprocessError("fail")):
+            result = engine.get_audio_duration("/tmp/test.mp3")
+
+        assert result is None
 
 
 class TestGenerateMultiPanelVideo:
