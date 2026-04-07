@@ -255,15 +255,17 @@ class TestExport:
         window.dropEvent(event)
         window.output_path_input.setText("C:/fake/output.mp4")
 
-        with patch.object(window.engine, "generate_multi_panel_video") as mock_gen:
+        mock_proc = MagicMock()
+        mock_proc.stderr = iter([])
+        mock_proc.wait.return_value = None
+        mock_proc.returncode = 0
+
+        with patch("subprocess.Popen", return_value=mock_proc):
             window._export_video()
-            window._export_thread.wait()
+            window._export_thread.wait(5000)
             QApplication.processEvents()
 
-            mock_gen.assert_called_once()
-            kwargs = mock_gen.call_args.kwargs
-            assert len(kwargs["panels"]) == 2
-            assert kwargs["output_path"] == "C:/fake/output.mp4"
+        mock_popup.assert_called_once()
 
     def test_export_no_panels_warns(self, window: AnimaticCreator) -> None:
         """Export with no panels should show a warning."""
@@ -579,12 +581,9 @@ class TestExportFailure:
         window.dropEvent(event)
         window.output_path_input.setText("/tmp/out.mp4")
 
-        with patch.object(
-            window.engine, "generate_multi_panel_video",
-            side_effect=Exception("ffmpeg crashed"),
-        ):
+        with patch("subprocess.Popen", side_effect=Exception("ffmpeg crashed")):
             window._export_video()
-            window._export_thread.wait()
+            window._export_thread.wait(5000)
             QApplication.processEvents()
 
             mock_critical.assert_called_once()

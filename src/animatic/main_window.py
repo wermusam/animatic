@@ -20,6 +20,7 @@ from PySide6.QtWidgets import (
     QListWidgetItem,
     QMainWindow,
     QMessageBox,
+    QProgressBar,
     QPushButton,
     QSlider,
     QStyle,
@@ -42,23 +43,53 @@ class ExportThread(QThread):
 
     succeeded = Signal(str)
     failed = Signal(str)
+    progress = Signal(int)
 
     def __init__(self, engine: AnimaticEngine, panels: list, output_path: str,
-                 audio_path: str | None = None) -> None:
+                 audio_path: str | None = None, total_duration: float = 0.0) -> None:
         super().__init__()
         self.engine = engine
         self.panels = panels
         self.output_path = output_path
         self.audio_path = audio_path
+        self.total_duration = total_duration
 
     def run(self) -> None:
-        """Execute the FFmpeg render."""
+        """Execute the FFmpeg render and report progress."""
+        import re
+        import subprocess
+
         try:
-            self.engine.generate_multi_panel_video(
-                panels=self.panels,
-                output_path=self.output_path,
-                audio_path=self.audio_path,
+            cmd = self.engine._build_multi_panel_cmd(
+                self.panels, self.output_path, self.audio_path,
             )
+
+            startupinfo = None
+            if os.name == "nt":
+                startupinfo = subprocess.STARTUPINFO()
+                startupinfo.dwFlags |= subprocess.STARTF_USESHOWWINDOW
+
+            proc = subprocess.Popen(
+                cmd, stderr=subprocess.PIPE, stdin=subprocess.DEVNULL,
+                startupinfo=startupinfo, universal_newlines=True,
+            )
+
+            time_pattern = re.compile(r"time=(\d+):(\d+):(\d+\.\d+)")
+            for line in proc.stderr:
+                match = time_pattern.search(line)
+                if match and self.total_duration > 0:
+                    h = float(match.group(1))
+                    m = float(match.group(2))
+                    s = float(match.group(3))
+                    current = h * 3600 + m * 60 + s
+                    pct = min(int((current / self.total_duration) * 100), 99)
+                    self.progress.emit(pct)
+
+            proc.wait()
+            if proc.returncode != 0:
+                raise subprocess.CalledProcessError(proc.returncode, cmd)
+
+            self.progress.emit(100)
             self.succeeded.emit(self.output_path)
         except Exception as e:
             self.failed.emit(str(e))
@@ -129,6 +160,41 @@ class PanelStrip(QListWidget):
         self.setVerticalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
 
 
+class UndoStack:
+    """Simple undo/redo stack that stores project snapshots."""
+
+    def __init__(self) -> None:
+        self._undo: list[dict] = []
+        self._redo: list[dict] = []
+
+    def push(self, project: "Project") -> None:
+        """Save the current project state before a change."""
+        self._undo.append(project.to_dict())
+        self._redo.clear()
+
+    def undo(self, project: "Project") -> Optional["Project"]:
+        """Restore the previous state. Returns the restored Project or None."""
+        if not self._undo:
+            return None
+        self._redo.append(project.to_dict())
+        data = self._undo.pop()
+        return Project.from_dict(data)
+
+    def redo(self, project: "Project") -> Optional["Project"]:
+        """Re-apply the last undone change. Returns the restored Project or None."""
+        if not self._redo:
+            return None
+        self._undo.append(project.to_dict())
+        data = self._redo.pop()
+        return Project.from_dict(data)
+
+    def can_undo(self) -> bool:
+        return len(self._undo) > 0
+
+    def can_redo(self) -> bool:
+        return len(self._redo) > 0
+
+
 class AnimaticCreator(QMainWindow):
     """Main application window for the animatic tool.
 
@@ -145,6 +211,7 @@ class AnimaticCreator(QMainWindow):
         self.project = Project()
         self.engine = AnimaticEngine()
         self._pixmap_cache: dict[str, QPixmap] = {}
+        self._undo_stack = UndoStack()
 
         self._setup_ui()
         self._setup_player()
@@ -307,6 +374,18 @@ class AnimaticCreator(QMainWindow):
 
         layout.addLayout(output_row)
 
+        # Export progress bar (hidden until export starts)
+        self.export_progress = QProgressBar()
+        self.export_progress.setRange(0, 100)
+        self.export_progress.setValue(0)
+        self.export_progress.setFixedHeight(20)
+        self.export_progress.setVisible(False)
+        self.export_progress.setStyleSheet(
+            "QProgressBar { border: 1px solid #444; border-radius: 3px; background: #2d2d2d; text-align: center; color: white; }"
+            "QProgressBar::chunk { background-color: #ff3366; border-radius: 3px; }"
+        )
+        layout.addWidget(self.export_progress)
+
         # Export button
         self.export_btn = QPushButton("Export Video")
         self.export_btn.setObjectName("ActionBtn")
@@ -343,6 +422,7 @@ class AnimaticCreator(QMainWindow):
 
     def dropEvent(self, event: QDropEvent) -> None:
         """Handle dropped files — images become panels, audio sets the track."""
+        self._undo_stack.push(self.project)
         urls = event.mimeData().urls()
         for url in urls:
             file_path = url.toLocalFile()
@@ -384,6 +464,7 @@ class AnimaticCreator(QMainWindow):
         item.setIcon(thumb)
         item.setText(f"{panel.duration}s")
         item.setData(Qt.ItemDataRole.UserRole, panel.panel_id)
+        item.setFlags(item.flags() | Qt.ItemFlag.ItemIsDragEnabled | Qt.ItemFlag.ItemIsDropEnabled)
         self.panel_strip.addItem(item)
 
         # Cache full-size pixmap for preview
@@ -470,6 +551,7 @@ class AnimaticCreator(QMainWindow):
         current = self.panel_strip.currentItem()
         if current is None:
             return
+        self._undo_stack.push(self.project)
         panel_id = current.data(Qt.ItemDataRole.UserRole)
         panel = self._find_panel(panel_id)
         if panel:
@@ -482,6 +564,7 @@ class AnimaticCreator(QMainWindow):
         current = self.panel_strip.currentItem()
         if current is None:
             return
+        self._undo_stack.push(self.project)
         panel_id = current.data(Qt.ItemDataRole.UserRole)
         self.project.remove_panel(panel_id)
         self._pixmap_cache.pop(panel_id, None)
@@ -694,6 +777,14 @@ class AnimaticCreator(QMainWindow):
             ctrl = bool(mods & Qt.KeyboardModifier.ControlModifier)
             in_text = isinstance(obj, (QLineEdit, QDoubleSpinBox))
 
+            # Ctrl+Z: undo, Ctrl+Shift+Z: redo
+            shift = bool(mods & Qt.KeyboardModifier.ShiftModifier)
+            if ctrl and key == Qt.Key.Key_Z and not shift:
+                self._undo()
+                return True
+            if ctrl and key == Qt.Key.Key_Z and shift:
+                self._redo()
+                return True
             # Ctrl+S: save project (works even in text inputs)
             if ctrl and key == Qt.Key.Key_S:
                 self._save_project()
@@ -738,8 +829,33 @@ class AnimaticCreator(QMainWindow):
         if panel:
             panel.notes = text
 
+    def _undo(self) -> None:
+        """Undo the last panel operation."""
+        restored = self._undo_stack.undo(self.project)
+        if restored:
+            self.project = restored
+            self._rebuild_strip()
+
+    def _redo(self) -> None:
+        """Redo the last undone operation."""
+        restored = self._undo_stack.redo(self.project)
+        if restored:
+            self.project = restored
+            self._rebuild_strip()
+
+    def _rebuild_strip(self) -> None:
+        """Rebuild the panel strip and UI from the current project state."""
+        self.player.stop()
+        self._pixmap_cache.clear()
+        self.panel_strip.clear()
+        for panel in self.project.panels:
+            self._add_panel_to_strip(panel)
+        self._update_status()
+        self._update_button_states()
+
     def _remove_panel_audio(self) -> None:
         """Remove audio from the currently selected panel."""
+        self._undo_stack.push(self.project)
         current = self.panel_strip.currentItem()
         if current is None:
             return
@@ -755,6 +871,7 @@ class AnimaticCreator(QMainWindow):
         current = self.panel_strip.currentItem()
         if current is None:
             return
+        self._undo_stack.push(self.project)
         panel_id = current.data(Qt.ItemDataRole.UserRole)
         new_panel = self.project.duplicate_panel(panel_id)
         if new_panel:
@@ -815,6 +932,7 @@ class AnimaticCreator(QMainWindow):
         row = self.panel_strip.currentRow()
         if row <= 0:
             return
+        self._undo_stack.push(self.project)
         self.project.reorder(row, row - 1)
         item = self.panel_strip.takeItem(row)
         self.panel_strip.insertItem(row - 1, item)
@@ -825,6 +943,7 @@ class AnimaticCreator(QMainWindow):
         row = self.panel_strip.currentRow()
         if row < 0 or row >= self.panel_strip.count() - 1:
             return
+        self._undo_stack.push(self.project)
         self.project.reorder(row, row + 1)
         item = self.panel_strip.takeItem(row)
         self.panel_strip.insertItem(row + 1, item)
@@ -848,17 +967,27 @@ class AnimaticCreator(QMainWindow):
 
         self.export_btn.setEnabled(False)
         self.export_btn.setText("Exporting...")
+        self.export_progress.setValue(0)
+        self.export_progress.setVisible(True)
         self._update_status_bar(0.0, playing=False)
 
         self._export_thread = ExportThread(
             self.engine, self.project.panels, output_path, self.project.audio_path,
+            total_duration=self.project.total_duration(),
         )
+        self._export_thread.progress.connect(self._on_export_progress)
         self._export_thread.succeeded.connect(self._on_export_success)
         self._export_thread.failed.connect(self._on_export_error)
         self._export_thread.start()
 
+    def _on_export_progress(self, pct: int) -> None:
+        """Update the progress bar during export."""
+        self.export_progress.setValue(pct)
+
     def _on_export_success(self, path: str) -> None:
         """Handle successful export."""
+        self.export_progress.setValue(100)
+        self.export_progress.setVisible(False)
         self.export_btn.setEnabled(True)
         self.export_btn.setText("Export Video")
         QMessageBox.information(self, "Success", f"Video exported!\n{path}")
@@ -866,6 +995,7 @@ class AnimaticCreator(QMainWindow):
 
     def _on_export_error(self, error: str) -> None:
         """Handle export failure."""
+        self.export_progress.setVisible(False)
         self.export_btn.setEnabled(True)
         self.export_btn.setText("Export Video")
         QMessageBox.critical(self, "Error", f"Export failed:\n{error}")
@@ -887,6 +1017,8 @@ class AnimaticCreator(QMainWindow):
             self, "Select Storyboard Images", "",
             "Images (*.png *.jpg *.jpeg)"
         )
+        if paths:
+            self._undo_stack.push(self.project)
         for path in paths:
             panel = self.project.add_panel(path)
             self._add_panel_to_strip(panel)
