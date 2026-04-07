@@ -800,6 +800,10 @@ class AnimaticCreator(QMainWindow):
             if ctrl and key == Qt.Key.Key_Right and not in_text:
                 self._move_panel_right()
                 return True
+            # Delete: remove selected panel
+            if key == Qt.Key.Key_Delete and not in_text:
+                self._remove_selected_panel()
+                return True
             # Space: play/pause
             if key == Qt.Key.Key_Space and not in_text:
                 self._toggle_playback()
