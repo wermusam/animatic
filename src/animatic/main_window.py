@@ -464,7 +464,7 @@ class AnimaticCreator(QMainWindow):
         item.setIcon(thumb)
         item.setText(f"{panel.duration}s")
         item.setData(Qt.ItemDataRole.UserRole, panel.panel_id)
-        item.setFlags(item.flags() | Qt.ItemFlag.ItemIsDragEnabled | Qt.ItemFlag.ItemIsDropEnabled)
+        item.setFlags(item.flags() | Qt.ItemFlag.ItemIsDragEnabled)
         self.panel_strip.addItem(item)
 
         # Cache full-size pixmap for preview
