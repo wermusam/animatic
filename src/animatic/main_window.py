@@ -244,6 +244,15 @@ class AnimaticCreator(QMainWindow):
         self.main_display.setScaledContents(False)
         layout.addWidget(self.main_display, stretch=1)
 
+        # Notes display below image
+        self.dialogue_label = QLabel("")
+        self.dialogue_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        self.dialogue_label.setWordWrap(True)
+        self.dialogue_label.setStyleSheet(
+            "color: #ffcc00; font-size: 16px; font-weight: bold; padding: 6px;"
+        )
+        layout.addWidget(self.dialogue_label)
+
         # Import buttons row
         import_row = QHBoxLayout()
 
@@ -620,6 +629,7 @@ class AnimaticCreator(QMainWindow):
             Qt.TransformationMode.SmoothTransformation,
         )
         self.main_display.setPixmap(display)
+        self.dialogue_label.setText(panel.notes if panel.notes else "")
 
     # -- Preview Playback --
 
