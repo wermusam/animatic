@@ -466,7 +466,7 @@ class AnimaticCreator(QMainWindow):
             if ext == ".animatic":
                 self._load_project(file_path)
                 return
-            elif ext in (".png", ".jpg", ".jpeg"):
+            elif ext in (".png", ".jpg", ".jpeg", ".gif"):
                 panel = self.project.add_panel(file_path)
                 self._add_panel_to_strip(panel)
             elif ext in (".mp3", ".wav", ".m4a"):
