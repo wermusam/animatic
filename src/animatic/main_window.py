@@ -4,6 +4,7 @@ Provides a multi-panel storyboard GUI with drag-and-drop,
 instant preview with timecode overlay, and FFmpeg export.
 """
 
+import copy
 import os
 import sys
 from datetime import datetime
@@ -75,17 +76,21 @@ class ExportThread(QThread):
             )
 
             time_pattern = re.compile(r"time=(\d+):(\d+):(\d+\.\d+)")
-            for line in proc.stderr:
-                match = time_pattern.search(line)
-                if match and self.total_duration > 0:
-                    h = float(match.group(1))
-                    m = float(match.group(2))
-                    s = float(match.group(3))
-                    current = h * 3600 + m * 60 + s
-                    pct = min(int((current / self.total_duration) * 100), 99)
-                    self.progress.emit(pct)
-
-            proc.wait()
+            try:
+                for line in proc.stderr:
+                    match = time_pattern.search(line)
+                    if match and self.total_duration > 0:
+                        h = float(match.group(1))
+                        m = float(match.group(2))
+                        s = float(match.group(3))
+                        current = h * 3600 + m * 60 + s
+                        pct = min(int((current / self.total_duration) * 100), 99)
+                        self.progress.emit(pct)
+            except Exception:
+                proc.kill()
+                raise
+            finally:
+                proc.wait()
             if proc.returncode != 0:
                 raise subprocess.CalledProcessError(proc.returncode, cmd)
 
@@ -212,6 +217,11 @@ class AnimaticCreator(QMainWindow):
         self.engine = AnimaticEngine()
         self._pixmap_cache: dict[str, QPixmap] = {}
         self._undo_stack = UndoStack()
+        self._export_thread: Optional[ExportThread] = None
+        self._notes_undo_timer = QTimer(self)
+        self._notes_undo_timer.setSingleShot(True)
+        self._notes_undo_timer.setInterval(500)
+        self._notes_undo_timer.timeout.connect(self._push_notes_undo)
 
         self._setup_ui()
         self._setup_player()
@@ -431,6 +441,9 @@ class AnimaticCreator(QMainWindow):
 
     def dropEvent(self, event: QDropEvent) -> None:
         """Handle dropped files — images become panels, audio sets the track."""
+        if self.player.is_playing():
+            self.player.stop()
+            self.play_btn.setText("Play")
         self._undo_stack.push(self.project)
         urls = event.mimeData().urls()
         for url in urls:
@@ -546,6 +559,9 @@ class AnimaticCreator(QMainWindow):
 
     def _sync_panel_order(self) -> None:
         """Read strip order and update the project to match."""
+        if self.player.is_playing():
+            self.player.stop()
+            self.play_btn.setText("Play")
         panel_map = {p.panel_id: p for p in self.project.panels}
         new_panels: list[Panel] = []
         for i in range(self.panel_strip.count()):
@@ -574,6 +590,9 @@ class AnimaticCreator(QMainWindow):
         current = self.panel_strip.currentItem()
         if current is None:
             return
+        if self.player.is_playing():
+            self.player.stop()
+            self.play_btn.setText("Play")
         self._undo_stack.push(self.project)
         panel_id = current.data(Qt.ItemDataRole.UserRole)
         self.project.remove_panel(panel_id)
@@ -846,6 +865,11 @@ class AnimaticCreator(QMainWindow):
         panel = self._find_panel(panel_id)
         if panel:
             panel.notes = text
+            self._notes_undo_timer.start()
+
+    def _push_notes_undo(self) -> None:
+        """Push an undo snapshot after notes editing pauses."""
+        self._undo_stack.push(self.project)
 
     def _undo(self) -> None:
         """Undo the last panel operation."""
@@ -931,7 +955,12 @@ class AnimaticCreator(QMainWindow):
         Args:
             path: Path to the .animatic file.
         """
-        self.project = Project.load(path)
+        try:
+            loaded = Project.load(path)
+        except Exception as e:
+            QMessageBox.critical(self, "Error", f"Failed to load project:\n{e}")
+            return
+        self.project = loaded
         self.player.stop()
         self._pixmap_cache.clear()
         self.panel_strip.clear()
@@ -978,6 +1007,9 @@ class AnimaticCreator(QMainWindow):
             QMessageBox.warning(self, "Error", "Add some panels first!")
             return
 
+        if self._export_thread is not None and self._export_thread.isRunning():
+            return
+
         output_path = self.output_path_input.text().strip()
         if not output_path:
             output_path = self._generate_output_path()
@@ -1000,7 +1032,8 @@ class AnimaticCreator(QMainWindow):
         self._update_status_bar(0.0, playing=False)
 
         self._export_thread = ExportThread(
-            self.engine, self.project.panels, output_path, self.project.audio_path,
+            self.engine, copy.deepcopy(self.project.panels), output_path,
+            self.project.audio_path,
             total_duration=self.project.total_duration(),
         )
         self._export_thread.progress.connect(self._on_export_progress)
