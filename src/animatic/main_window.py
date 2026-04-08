@@ -267,6 +267,12 @@ class AnimaticCreator(QMainWindow):
         layout.setSpacing(4)
         layout.setContentsMargins(12, 8, 12, 8)
 
+        # Title
+        self.title_label = QLabel("Storyboard Animatic")
+        self.title_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        self.title_label.setObjectName("TitleLabel")
+        layout.addWidget(self.title_label)
+
         # Main image display
         self.main_display = QLabel("Drop images here or click Add Images")
         self.main_display.setAlignment(Qt.AlignmentFlag.AlignCenter)
