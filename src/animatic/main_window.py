@@ -261,29 +261,11 @@ class AnimaticCreator(QMainWindow):
 
     def _setup_ui(self) -> None:
         """Build the GUI layout."""
-        from PySide6.QtWidgets import QScrollArea
-
-        scroll = QScrollArea()
-        scroll.setWidgetResizable(True)
-        scroll.setFrameShape(QScrollArea.Shape.NoFrame)
-        scroll.setStyleSheet(
-            "QScrollArea { background-color: #1e1e1e; border: none; }"
-            "QScrollArea > QWidget > QWidget { background-color: #1e1e1e; }"
-            "QWidget { background-color: #1e1e1e; }"
-        )
-        self.setCentralWidget(scroll)
-
         central = QWidget()
-        scroll.setWidget(central)
+        self.setCentralWidget(central)
         layout = QVBoxLayout(central)
-        layout.setSpacing(8)
-        layout.setContentsMargins(20, 12, 20, 12)
-
-        # Title
-        self.title_label = QLabel("Storyboard Animatic")
-        self.title_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
-        self.title_label.setObjectName("TitleLabel")
-        layout.addWidget(self.title_label)
+        layout.setSpacing(4)
+        layout.setContentsMargins(12, 8, 12, 8)
 
         # Main image display
         self.main_display = QLabel("Drop images here or click Add Images")
@@ -337,6 +319,7 @@ class AnimaticCreator(QMainWindow):
 
         # Panel strip
         self.panel_strip = PanelStrip()
+        self.panel_strip.setFixedHeight(80)
         self.panel_strip.currentItemChanged.connect(self._on_panel_selected)
         self.panel_strip.model().rowsMoved.connect(self._on_panels_reordered)
         layout.addWidget(self.panel_strip)
