@@ -32,11 +32,12 @@ from PySide6.QtCore import QEvent, QObject, QSize, Qt, QThread, QTimer, Signal
 from PySide6.QtGui import (
     QDragEnterEvent,
     QDropEvent,
-    QKeyEvent,
     QPixmap,
 )
 
 from animatic.engine import AnimaticEngine
+from animatic.models import Panel, Project
+from animatic.player import PreviewPlayer
 
 
 class ExportThread(QThread):
@@ -46,8 +47,14 @@ class ExportThread(QThread):
     failed = Signal(str)
     progress = Signal(int)
 
-    def __init__(self, engine: AnimaticEngine, panels: list, output_path: str,
-                 audio_path: str | None = None, total_duration: float = 0.0) -> None:
+    def __init__(
+        self,
+        engine: AnimaticEngine,
+        panels: list,
+        output_path: str,
+        audio_path: str | None = None,
+        total_duration: float = 0.0,
+    ) -> None:
         super().__init__()
         self.engine = engine
         self.panels = panels
@@ -62,7 +69,9 @@ class ExportThread(QThread):
 
         try:
             cmd = self.engine._build_multi_panel_cmd(
-                self.panels, self.output_path, self.audio_path,
+                self.panels,
+                self.output_path,
+                self.audio_path,
             )
 
             startupinfo = None
@@ -71,8 +80,11 @@ class ExportThread(QThread):
                 startupinfo.dwFlags |= subprocess.STARTF_USESHOWWINDOW
 
             proc = subprocess.Popen(
-                cmd, stderr=subprocess.PIPE, stdin=subprocess.DEVNULL,
-                startupinfo=startupinfo, universal_newlines=True,
+                cmd,
+                stderr=subprocess.PIPE,
+                stdin=subprocess.DEVNULL,
+                startupinfo=startupinfo,
+                universal_newlines=True,
             )
 
             time_pattern = re.compile(r"time=(\d+):(\d+):(\d+\.\d+)")
@@ -98,8 +110,6 @@ class ExportThread(QThread):
             self.succeeded.emit(self.output_path)
         except Exception as e:
             self.failed.emit(str(e))
-from animatic.models import Panel, Project
-from animatic.player import PreviewPlayer
 
 
 class JumpSlider(QSlider):
@@ -116,8 +126,10 @@ class JumpSlider(QSlider):
             # setSliderDown first so sliderPressed fires before valueChanged
             self.setSliderDown(True)
             val = QStyle.sliderValueFromPosition(
-                self.minimum(), self.maximum(),
-                int(event.position().x()), self.width(),
+                self.minimum(),
+                self.maximum(),
+                int(event.position().x()),
+                self.width(),
             )
             self.setSliderPosition(val)
             event.accept()
@@ -128,8 +140,10 @@ class JumpSlider(QSlider):
         """Update slider position while dragging."""
         if self.isSliderDown():
             val = QStyle.sliderValueFromPosition(
-                self.minimum(), self.maximum(),
-                int(event.position().x()), self.width(),
+                self.minimum(),
+                self.maximum(),
+                int(event.position().x()),
+                self.width(),
             )
             self.setSliderPosition(val)
             event.accept()
@@ -266,17 +280,17 @@ class AnimaticCreator(QMainWindow):
         # Import buttons row
         import_row = QHBoxLayout()
 
-        self.add_images_btn = QPushButton("\U0001F4C2 Add Images")
+        self.add_images_btn = QPushButton("\U0001f4c2 Add Images")
         self.add_images_btn.setObjectName("ImportBtn")
         self.add_images_btn.clicked.connect(self._browse_images)
         import_row.addWidget(self.add_images_btn)
 
-        self.add_audio_btn = QPushButton("\U0001F50A Add Audio")
+        self.add_audio_btn = QPushButton("\U0001f50a Add Audio")
         self.add_audio_btn.setObjectName("AudioImportBtn")
         self.add_audio_btn.clicked.connect(self._browse_audio)
         import_row.addWidget(self.add_audio_btn)
 
-        self.save_btn = QPushButton("\U0001F4BE Save Project")
+        self.save_btn = QPushButton("\U0001f4be Save Project")
         self.save_btn.setObjectName("ImportBtn")
         self.save_btn.clicked.connect(self._save_project)
         import_row.addWidget(self.save_btn)
@@ -382,7 +396,9 @@ class AnimaticCreator(QMainWindow):
         # Output row
         output_row = QHBoxLayout()
         self.output_path_input = QLineEdit()
-        self.output_path_input.setPlaceholderText("Save location (auto-generated or browse)")
+        self.output_path_input.setPlaceholderText(
+            "Save location (auto-generated or browse)"
+        )
         self.output_path_input.setObjectName("InputBox")
         output_row.addWidget(self.output_path_input)
 
@@ -458,7 +474,6 @@ class AnimaticCreator(QMainWindow):
             elif ext in (".mp3", ".wav", ".m4a"):
                 self._set_audio(file_path)
 
-
         self._update_status()
         self._update_button_states()
         self._set_default_output_path()
@@ -477,7 +492,8 @@ class AnimaticCreator(QMainWindow):
             pixmap.fill(Qt.GlobalColor.darkGray)
 
         thumb = pixmap.scaled(
-            120, 80,
+            120,
+            80,
             Qt.AspectRatioMode.KeepAspectRatio,
             Qt.TransformationMode.SmoothTransformation,
         )
@@ -495,7 +511,9 @@ class AnimaticCreator(QMainWindow):
         # Select the newly added panel
         self.panel_strip.setCurrentItem(item)
 
-    def _cache_panel_pixmap(self, panel: Panel, pixmap: Optional[QPixmap] = None) -> None:
+    def _cache_panel_pixmap(
+        self, panel: Panel, pixmap: Optional[QPixmap] = None
+    ) -> None:
         """Cache the original full-size pixmap for a panel.
 
         The pixmap is scaled to fit the display each time it's shown,
@@ -644,7 +662,8 @@ class AnimaticCreator(QMainWindow):
         if display_h < 100:
             display_h = 400
         display = original.scaled(
-            display_w, display_h,
+            display_w,
+            display_h,
             Qt.AspectRatioMode.KeepAspectRatio,
             Qt.TransformationMode.SmoothTransformation,
         )
@@ -747,7 +766,10 @@ class AnimaticCreator(QMainWindow):
             target_time = (value / 1000.0) * total
             cumulative = 0.0
             for i, panel in enumerate(self.project.panels):
-                if cumulative + panel.duration > target_time or i == len(self.project.panels) - 1:
+                if (
+                    cumulative + panel.duration > target_time
+                    or i == len(self.project.panels) - 1
+                ):
                     self._show_panel_image(panel, target_time)
                     self.timecode_label.setText(self._format_time(target_time))
                     self._update_status_bar(target_time, playing=False)
@@ -764,7 +786,10 @@ class AnimaticCreator(QMainWindow):
         # Find which panel this time falls in
         cumulative = 0.0
         for i, panel in enumerate(self.project.panels):
-            if cumulative + panel.duration > target_time or i == len(self.project.panels) - 1:
+            if (
+                cumulative + panel.duration > target_time
+                or i == len(self.project.panels) - 1
+            ):
                 self._show_panel_image(panel, target_time)
                 self.timecode_label.setText(self._format_time(target_time))
                 self._update_status_bar(target_time, playing=False)
@@ -925,7 +950,8 @@ class AnimaticCreator(QMainWindow):
                 pixmap.fill(Qt.GlobalColor.darkGray)
 
             thumb = pixmap.scaled(
-                120, 80,
+                120,
+                80,
                 Qt.AspectRatioMode.KeepAspectRatio,
                 Qt.TransformationMode.SmoothTransformation,
             )
@@ -1032,7 +1058,9 @@ class AnimaticCreator(QMainWindow):
         self._update_status_bar(0.0, playing=False)
 
         self._export_thread = ExportThread(
-            self.engine, copy.deepcopy(self.project.panels), output_path,
+            self.engine,
+            copy.deepcopy(self.project.panels),
+            output_path,
             self.project.audio_path,
             total_duration=self.project.total_duration(),
         )
@@ -1075,8 +1103,7 @@ class AnimaticCreator(QMainWindow):
     def _browse_images(self) -> None:
         """Open a file dialog to select storyboard images."""
         paths, _ = QFileDialog.getOpenFileNames(
-            self, "Select Storyboard Images", "",
-            "Images (*.png *.jpg *.jpeg)"
+            self, "Select Storyboard Images", "", "Images (*.png *.jpg *.jpeg)"
         )
         if paths:
             self._undo_stack.push(self.project)
@@ -1091,8 +1118,7 @@ class AnimaticCreator(QMainWindow):
     def _browse_audio(self) -> None:
         """Open a file dialog to select an audio file for the selected panel."""
         path, _ = QFileDialog.getOpenFileName(
-            self, "Select Audio", "",
-            "Audio (*.mp3 *.wav)"
+            self, "Select Audio", "", "Audio (*.mp3 *.wav)"
         )
         if path:
             self._set_audio(path)

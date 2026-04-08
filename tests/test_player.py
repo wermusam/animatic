@@ -40,19 +40,25 @@ def sample_panels() -> list[Panel]:
 class TestPlayerLoad:
     """Tests for loading panels into the player."""
 
-    def test_load_sets_panels(self, player: PreviewPlayer, sample_panels: list[Panel]) -> None:
+    def test_load_sets_panels(
+        self, player: PreviewPlayer, sample_panels: list[Panel]
+    ) -> None:
         """Loading panels should store them and reset state."""
         player.load(sample_panels)
         assert player.current_index() == 0
         assert player.total_elapsed() == 0.0
         assert not player.is_playing()
 
-    def test_load_without_audio(self, player: PreviewPlayer, sample_panels: list[Panel]) -> None:
+    def test_load_without_audio(
+        self, player: PreviewPlayer, sample_panels: list[Panel]
+    ) -> None:
         """Loading without audio should not error."""
         player.load(sample_panels, audio_path=None)
         assert not player._has_audio
 
-    def test_load_resets_previous_state(self, player: PreviewPlayer, sample_panels: list[Panel]) -> None:
+    def test_load_resets_previous_state(
+        self, player: PreviewPlayer, sample_panels: list[Panel]
+    ) -> None:
         """Loading new panels should reset any previous playback state."""
         player.load(sample_panels)
         player.play()
@@ -64,7 +70,9 @@ class TestPlayerLoad:
 class TestPlayerPlayback:
     """Tests for play, pause, and stop."""
 
-    def test_play_starts(self, player: PreviewPlayer, sample_panels: list[Panel]) -> None:
+    def test_play_starts(
+        self, player: PreviewPlayer, sample_panels: list[Panel]
+    ) -> None:
         """Play should set playing state to True."""
         player.load(sample_panels)
         player.play()
@@ -82,7 +90,9 @@ class TestPlayerPlayback:
         player.pause()
         assert not player.is_playing()
 
-    def test_stop_resets(self, player: PreviewPlayer, sample_panels: list[Panel]) -> None:
+    def test_stop_resets(
+        self, player: PreviewPlayer, sample_panels: list[Panel]
+    ) -> None:
         """Stop should reset index and elapsed time."""
         player.load(sample_panels)
         player.play()
@@ -122,52 +132,68 @@ class TestPlayerPlayback:
 class TestPlayerNavigation:
     """Tests for seek, next, and prev."""
 
-    def test_seek_to_panel(self, player: PreviewPlayer, sample_panels: list[Panel]) -> None:
+    def test_seek_to_panel(
+        self, player: PreviewPlayer, sample_panels: list[Panel]
+    ) -> None:
         """seek_to_panel should jump to the specified panel index."""
         player.load(sample_panels)
         player.seek_to_panel(2)
         assert player.current_index() == 2
 
-    def test_seek_computes_elapsed(self, player: PreviewPlayer, sample_panels: list[Panel]) -> None:
+    def test_seek_computes_elapsed(
+        self, player: PreviewPlayer, sample_panels: list[Panel]
+    ) -> None:
         """Seeking should compute total elapsed from preceding panel durations."""
         player.load(sample_panels)
         player.seek_to_panel(2)
         expected = sample_panels[0].duration + sample_panels[1].duration
         assert abs(player.total_elapsed() - expected) < 0.01
 
-    def test_seek_out_of_bounds(self, player: PreviewPlayer, sample_panels: list[Panel]) -> None:
+    def test_seek_out_of_bounds(
+        self, player: PreviewPlayer, sample_panels: list[Panel]
+    ) -> None:
         """Seeking to invalid index should be a no-op."""
         player.load(sample_panels)
         player.seek_to_panel(10)
         assert player.current_index() == 0
 
-    def test_seek_negative(self, player: PreviewPlayer, sample_panels: list[Panel]) -> None:
+    def test_seek_negative(
+        self, player: PreviewPlayer, sample_panels: list[Panel]
+    ) -> None:
         """Seeking to negative index should be a no-op."""
         player.load(sample_panels)
         player.seek_to_panel(-1)
         assert player.current_index() == 0
 
-    def test_next_panel(self, player: PreviewPlayer, sample_panels: list[Panel]) -> None:
+    def test_next_panel(
+        self, player: PreviewPlayer, sample_panels: list[Panel]
+    ) -> None:
         """next_panel should advance by one."""
         player.load(sample_panels)
         player.next_panel()
         assert player.current_index() == 1
 
-    def test_next_panel_at_end(self, player: PreviewPlayer, sample_panels: list[Panel]) -> None:
+    def test_next_panel_at_end(
+        self, player: PreviewPlayer, sample_panels: list[Panel]
+    ) -> None:
         """next_panel at the last panel should stay put."""
         player.load(sample_panels)
         player.seek_to_panel(2)
         player.next_panel()
         assert player.current_index() == 2
 
-    def test_prev_panel(self, player: PreviewPlayer, sample_panels: list[Panel]) -> None:
+    def test_prev_panel(
+        self, player: PreviewPlayer, sample_panels: list[Panel]
+    ) -> None:
         """prev_panel should go back by one."""
         player.load(sample_panels)
         player.seek_to_panel(2)
         player.prev_panel()
         assert player.current_index() == 1
 
-    def test_prev_panel_at_start(self, player: PreviewPlayer, sample_panels: list[Panel]) -> None:
+    def test_prev_panel_at_start(
+        self, player: PreviewPlayer, sample_panels: list[Panel]
+    ) -> None:
         """prev_panel at the first panel should stay put."""
         player.load(sample_panels)
         player.prev_panel()
