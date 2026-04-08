@@ -851,3 +851,80 @@ class TestBugFixes:
 
         # export_btn should still be enabled (export was cancelled)
         assert window.export_btn.isEnabled()
+
+
+class TestRound2BugFixes:
+    """Tests for the 8 reliability bug fixes (round 2)."""
+
+    def test_export_thread_initialized(self, window: AnimaticCreator) -> None:
+        """C1: _export_thread should be initialized to None in __init__."""
+        assert window._export_thread is None
+
+    def test_double_export_guard(
+        self, window: AnimaticCreator, temp_images: list[str]
+    ) -> None:
+        """M3: second export call while running should be a no-op."""
+        event, _mime = _make_drop_event([temp_images[0]])
+        window.dropEvent(event)
+
+        # Simulate a running export thread
+        window._export_thread = MagicMock()
+        window._export_thread.isRunning.return_value = True
+
+        window.output_path_input.setText("/tmp/test_output.mp4")
+        # This should return early without creating a new thread
+        window._export_video()
+        # The mock should still be the same object (not replaced)
+        assert window._export_thread.isRunning.return_value is True
+
+    def test_remove_panel_stops_playback(
+        self, window: AnimaticCreator, temp_images: list[str]
+    ) -> None:
+        """M1: removing a panel during playback should stop the player."""
+        event, _mime = _make_drop_event(temp_images[:2])
+        window.dropEvent(event)
+
+        # Mock player as playing
+        window.player.is_playing = MagicMock(return_value=True)
+        window.player.stop = MagicMock()
+
+        window.panel_strip.setCurrentRow(0)
+        window._remove_selected_panel()
+
+        window.player.stop.assert_called_once()
+        assert window.play_btn.text() == "Play"
+
+    def test_drop_stops_playback(
+        self, window: AnimaticCreator, temp_images: list[str]
+    ) -> None:
+        """M2: dropping images during playback should stop the player."""
+        event, _mime = _make_drop_event([temp_images[0]])
+        window.dropEvent(event)
+
+        # Mock player as playing
+        window.player.is_playing = MagicMock(return_value=True)
+        window.player.stop = MagicMock()
+
+        event2, _mime2 = _make_drop_event([temp_images[1]])
+        window.dropEvent(event2)
+
+        window.player.stop.assert_called_once()
+
+    def test_corrupt_project_shows_error(
+        self, window: AnimaticCreator, tmp_path
+    ) -> None:
+        """M5: loading a corrupt .animatic file should show error, not crash."""
+        corrupt_file = str(tmp_path / "corrupt.animatic")
+        with open(corrupt_file, "w") as f:
+            f.write("NOT VALID JSON{{{")
+
+        with patch("animatic.main_window.QMessageBox.critical") as mock_crit:
+            window._load_project(corrupt_file)
+            mock_crit.assert_called_once()
+            assert "Failed to load" in mock_crit.call_args[0][2]
+
+    def test_notes_undo_timer_exists(self, window: AnimaticCreator) -> None:
+        """M4: notes undo timer should be set up in __init__."""
+        assert hasattr(window, "_notes_undo_timer")
+        assert window._notes_undo_timer.isSingleShot()
+        assert window._notes_undo_timer.interval() == 500
