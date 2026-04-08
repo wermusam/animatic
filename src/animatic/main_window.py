@@ -57,6 +57,7 @@ class ExportThread(QThread):
         audio_path: str | None = None,
         total_duration: float = 0.0,
         burn_dialogue: bool = False,
+        burn_notes: bool = False,
     ) -> None:
         super().__init__()
         self.engine = engine
@@ -65,6 +66,7 @@ class ExportThread(QThread):
         self.audio_path = audio_path
         self.total_duration = total_duration
         self.burn_dialogue = burn_dialogue
+        self.burn_notes = burn_notes
 
     def run(self) -> None:
         """Execute the FFmpeg render and report progress."""
@@ -77,6 +79,7 @@ class ExportThread(QThread):
                 self.output_path,
                 self.audio_path,
                 burn_dialogue=self.burn_dialogue,
+                burn_notes=self.burn_notes,
             )
 
             startupinfo = None
@@ -456,6 +459,13 @@ class AnimaticCreator(QMainWindow):
             "When checked, dialogue text appears as subtitles in the exported video"
         )
         export_row.addWidget(self.burn_dialogue_cb)
+
+        self.burn_notes_cb = QCheckBox("Burn notes into export")
+        self.burn_notes_cb.setChecked(False)
+        self.burn_notes_cb.setToolTip(
+            "When checked, director notes appear at the top of the exported video"
+        )
+        export_row.addWidget(self.burn_notes_cb)
 
         export_row.addStretch()
 
@@ -1185,6 +1195,7 @@ class AnimaticCreator(QMainWindow):
             self.project.audio_path,
             total_duration=self.project.total_duration(),
             burn_dialogue=self.burn_dialogue_cb.isChecked(),
+            burn_notes=self.burn_notes_cb.isChecked(),
         )
         self._export_thread.progress.connect(self._on_export_progress)
         self._export_thread.succeeded.connect(self._on_export_success)
