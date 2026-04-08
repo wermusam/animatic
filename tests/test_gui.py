@@ -1143,7 +1143,7 @@ class TestReRecord:
         window.panel_strip.setCurrentRow(0)
 
         # Mock the multimedia imports to avoid needing real hardware
-        with patch("animatic.main_window.AnimaticCreator._toggle_recording") as mock_toggle:
+        with patch("animatic.main_window.AnimaticCreator._toggle_recording"):
             # Directly test the clearing logic
             panel = window.project.panels[0]
             assert panel.audio_path == temp_audio
