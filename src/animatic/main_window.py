@@ -7,6 +7,7 @@ instant preview with timecode overlay, and FFmpeg export.
 import copy
 import os
 import sys
+import tempfile
 from datetime import datetime
 from typing import Optional
 
@@ -18,6 +19,7 @@ from PySide6.QtGui import (
 )
 from PySide6.QtWidgets import (
     QApplication,
+    QCheckBox,
     QDoubleSpinBox,
     QFileDialog,
     QHBoxLayout,
@@ -54,6 +56,7 @@ class ExportThread(QThread):
         output_path: str,
         audio_path: str | None = None,
         total_duration: float = 0.0,
+        burn_dialogue: bool = False,
     ) -> None:
         super().__init__()
         self.engine = engine
@@ -61,6 +64,7 @@ class ExportThread(QThread):
         self.output_path = output_path
         self.audio_path = audio_path
         self.total_duration = total_duration
+        self.burn_dialogue = burn_dialogue
 
     def run(self) -> None:
         """Execute the FFmpeg render and report progress."""
@@ -72,6 +76,7 @@ class ExportThread(QThread):
                 self.panels,
                 self.output_path,
                 self.audio_path,
+                burn_dialogue=self.burn_dialogue,
             )
 
             startupinfo = None
@@ -236,6 +241,10 @@ class AnimaticCreator(QMainWindow):
         self._notes_undo_timer.setSingleShot(True)
         self._notes_undo_timer.setInterval(500)
         self._notes_undo_timer.timeout.connect(self._push_notes_undo)
+        self._recorder = None
+        self._capture_session = None
+        self._audio_input = None
+        self._recording_path: Optional[str] = None
 
         self._setup_ui()
         self._setup_player()
@@ -289,6 +298,12 @@ class AnimaticCreator(QMainWindow):
         self.add_audio_btn.setObjectName("AudioImportBtn")
         self.add_audio_btn.clicked.connect(self._browse_audio)
         import_row.addWidget(self.add_audio_btn)
+
+        self.record_btn = QPushButton("\U0001f3a4 Record")
+        self.record_btn.setObjectName("AudioImportBtn")
+        self.record_btn.setToolTip("Record audio from microphone for the selected panel")
+        self.record_btn.clicked.connect(self._toggle_recording)
+        import_row.addWidget(self.record_btn)
 
         self.save_btn = QPushButton("\U0001f4be Save Project")
         self.save_btn.setObjectName("ImportBtn")
@@ -346,9 +361,16 @@ class AnimaticCreator(QMainWindow):
 
         layout.addLayout(controls)
 
-        # Panel notes
+        # Dialogue field (shown as subtitle in preview and export)
+        self.dialogue_input = QLineEdit()
+        self.dialogue_input.setPlaceholderText("Dialogue (shown as subtitle in export)...")
+        self.dialogue_input.setObjectName("InputBox")
+        self.dialogue_input.textChanged.connect(self._on_dialogue_changed)
+        layout.addWidget(self.dialogue_input)
+
+        # Notes field (director-only, never exported)
         self.notes_input = QLineEdit()
-        self.notes_input.setPlaceholderText("Panel notes / dialogue...")
+        self.notes_input.setPlaceholderText("Notes (director only, not in export)...")
         self.notes_input.setObjectName("InputBox")
         self.notes_input.textChanged.connect(self._on_notes_changed)
         layout.addWidget(self.notes_input)
@@ -419,11 +441,24 @@ class AnimaticCreator(QMainWindow):
         )
         layout.addWidget(self.export_progress)
 
-        # Export button
+        # Export row: checkbox + button
+        export_row = QHBoxLayout()
+
+        self.burn_dialogue_cb = QCheckBox("Burn dialogue into export")
+        self.burn_dialogue_cb.setChecked(True)
+        self.burn_dialogue_cb.setToolTip(
+            "When checked, dialogue text appears as subtitles in the exported video"
+        )
+        export_row.addWidget(self.burn_dialogue_cb)
+
+        export_row.addStretch()
+
         self.export_btn = QPushButton("Export Video")
         self.export_btn.setObjectName("ActionBtn")
         self.export_btn.clicked.connect(self._export_video)
-        layout.addWidget(self.export_btn)
+        export_row.addWidget(self.export_btn)
+
+        layout.addLayout(export_row)
 
     def _setup_player(self) -> None:
         """Initialize the preview player and connect signals."""
@@ -552,7 +587,10 @@ class AnimaticCreator(QMainWindow):
             self.timecode_label.setText(self._format_time(elapsed))
             self._update_status_bar(elapsed, playing=False)
 
-            # Populate notes field
+            # Populate dialogue and notes fields
+            self.dialogue_input.blockSignals(True)
+            self.dialogue_input.setText(panel.dialogue)
+            self.dialogue_input.blockSignals(False)
             self.notes_input.blockSignals(True)
             self.notes_input.setText(panel.notes)
             self.notes_input.blockSignals(False)
@@ -662,7 +700,7 @@ class AnimaticCreator(QMainWindow):
             Qt.TransformationMode.SmoothTransformation,
         )
         self.main_display.setPixmap(display)
-        self.dialogue_label.setText(panel.notes if panel.notes else "")
+        self.dialogue_label.setText(panel.dialogue if panel.dialogue else "")
 
     # -- Preview Playback --
 
@@ -699,6 +737,9 @@ class AnimaticCreator(QMainWindow):
             panel = self.project.panels[index]
             self._show_panel_image(panel, self.player.total_elapsed())
             self.panel_strip.setCurrentRow(index)
+            self.dialogue_input.blockSignals(True)
+            self.dialogue_input.setText(panel.dialogue)
+            self.dialogue_input.blockSignals(False)
             self.notes_input.blockSignals(True)
             self.notes_input.setText(panel.notes)
             self.notes_input.blockSignals(False)
@@ -869,6 +910,18 @@ class AnimaticCreator(QMainWindow):
 
     # -- New Feature Handlers --
 
+    def _on_dialogue_changed(self, text: str) -> None:
+        """Update the selected panel's dialogue when the text field changes."""
+        current = self.panel_strip.currentItem()
+        if current is None:
+            return
+        panel_id = current.data(Qt.ItemDataRole.UserRole)
+        panel = self._find_panel(panel_id)
+        if panel:
+            panel.dialogue = text
+            self.dialogue_label.setText(text)
+            self._notes_undo_timer.start()
+
     def _on_notes_changed(self, text: str) -> None:
         """Update the selected panel's notes when the text field changes."""
         current = self.panel_strip.currentItem()
@@ -920,6 +973,71 @@ class AnimaticCreator(QMainWindow):
             panel.audio_path = None
             self.panel_audio_label.setText("Panel Audio: None")
             self._update_button_states()
+
+    def _toggle_recording(self) -> None:
+        """Start or stop audio recording for the selected panel."""
+        if self._recorder is not None:
+            self._stop_recording()
+            return
+
+        current = self.panel_strip.currentItem()
+        if current is None:
+            QMessageBox.warning(self, "Error", "Select a panel first!")
+            return
+
+        try:
+            from PySide6.QtMultimedia import (
+                QAudioInput,
+                QMediaCaptureSession,
+                QMediaRecorder,
+            )
+        except ImportError:
+            QMessageBox.warning(
+                self,
+                "Error",
+                "Audio recording requires PySide6 multimedia support.",
+            )
+            return
+
+        self._recording_path = os.path.join(
+            tempfile.gettempdir(), f"animatic_rec_{current.data(Qt.ItemDataRole.UserRole)}.wav"
+        )
+
+        self._audio_input = QAudioInput(self)
+        self._capture_session = QMediaCaptureSession(self)
+        self._capture_session.setAudioInput(self._audio_input)
+        self._recorder = QMediaRecorder(self)
+        self._capture_session.setRecorder(self._recorder)
+
+        from PySide6.QtCore import QUrl
+
+        self._recorder.setOutputLocation(QUrl.fromLocalFile(self._recording_path))
+        self._recorder.record()
+
+        self.record_btn.setText("\u23f9 Stop")
+        self.record_btn.setStyleSheet("background-color: #cc3333; color: white;")
+
+    def _stop_recording(self) -> None:
+        """Stop recording and assign the audio to the selected panel."""
+        if self._recorder is None:
+            return
+
+        self._recorder.stop()
+        self._recorder.deleteLater()
+        self._recorder = None
+        if self._capture_session:
+            self._capture_session.deleteLater()
+            self._capture_session = None
+        if self._audio_input:
+            self._audio_input.deleteLater()
+            self._audio_input = None
+
+        self.record_btn.setText("\U0001f3a4 Record")
+        self.record_btn.setStyleSheet("")
+
+        if self._recording_path and os.path.exists(self._recording_path):
+            self._set_audio(self._recording_path)
+        self._recording_path = None
 
     def _duplicate_selected_panel(self) -> None:
         """Duplicate the selected panel and insert the copy after it."""
@@ -1051,6 +1169,7 @@ class AnimaticCreator(QMainWindow):
             output_path,
             self.project.audio_path,
             total_duration=self.project.total_duration(),
+            burn_dialogue=self.burn_dialogue_cb.isChecked(),
         )
         self._export_thread.progress.connect(self._on_export_progress)
         self._export_thread.succeeded.connect(self._on_export_success)

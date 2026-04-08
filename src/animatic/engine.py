@@ -137,6 +137,7 @@ class AnimaticEngine:
         panels: list[Panel],
         output_path: str,
         audio_path: Optional[str],
+        burn_dialogue: bool = False,
     ) -> list[str]:
         """Build the FFmpeg command for multi-panel concat.
 
@@ -191,7 +192,16 @@ class AnimaticEngine:
 
         for i, vid_idx in enumerate(panel_video_inputs):
             vlabel = f"v{i}"
-            filter_parts.append(f"[{vid_idx}:v]{scale_filter}[{vlabel}]")
+            vfilter = scale_filter
+            if burn_dialogue and panels[i].dialogue:
+                escaped = self._escape_drawtext(panels[i].dialogue)
+                vfilter += (
+                    f",drawtext=text='{escaped}'"
+                    ":fontsize=28:fontcolor=white"
+                    ":borderw=2:bordercolor=black"
+                    ":x=(w-text_w)/2:y=h-th-60"
+                )
+            filter_parts.append(f"[{vid_idx}:v]{vfilter}[{vlabel}]")
 
             if has_per_panel_audio:
                 alabel = f"a{i}"
@@ -240,3 +250,12 @@ class AnimaticEngine:
             ]
         )
         return cmd
+
+    @staticmethod
+    def _escape_drawtext(text: str) -> str:
+        """Escape special characters for FFmpeg's drawtext filter."""
+        text = text.replace("\\", "\\\\\\\\")
+        text = text.replace("'", "'\\\\\\''")
+        text = text.replace(":", "\\\\:")
+        text = text.replace("%", "%%")
+        return text
