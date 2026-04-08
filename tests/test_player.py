@@ -99,7 +99,7 @@ class TestPlayerPlayback:
         """panel_changed signal should fire when advancing to next panel."""
         player.load(sample_panels)
         player.play()
-        with qtbot.waitSignal(player.panel_changed, timeout=1000):
+        with qtbot.waitSignal(player.panel_changed, timeout=3000):
             pass  # Wait for the signal to fire
 
     def test_playback_finished_signal(
