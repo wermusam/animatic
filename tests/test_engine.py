@@ -62,9 +62,7 @@ class TestBuildMultiPanelCmd:
     def test_single_panel_with_audio(self, engine: AnimaticEngine) -> None:
         """Single panel with audio should map audio and use -shortest."""
         panels = [Panel(image_path="/tmp/img.png", duration=5.0)]
-        cmd = engine._build_multi_panel_cmd(
-            panels, "/tmp/out.mp4", audio_path="/tmp/audio.mp3"
-        )
+        cmd = engine._build_multi_panel_cmd(panels, "/tmp/out.mp4", audio_path="/tmp/audio.mp3")
 
         assert "/tmp/audio.mp3" in cmd
         assert "-shortest" in cmd
@@ -80,9 +78,7 @@ class TestBuildMultiPanelCmd:
             Panel(image_path="/tmp/b.png", duration=3.0),
             Panel(image_path="/tmp/c.png", duration=4.0),
         ]
-        cmd = engine._build_multi_panel_cmd(
-            panels, "/tmp/out.mp4", audio_path="/tmp/audio.mp3"
-        )
+        cmd = engine._build_multi_panel_cmd(panels, "/tmp/out.mp4", audio_path="/tmp/audio.mp3")
 
         # Audio is the 4th input (index 3)
         assert "3:a" in cmd
@@ -153,9 +149,7 @@ class TestPerPanelAudio:
         """When panels have per-panel audio, global audio_path should be ignored."""
         panel = Panel(image_path="/tmp/img.png", duration=5.0)
         panel.audio_path = "/tmp/voice.mp3"
-        cmd = engine._build_multi_panel_cmd(
-            [panel], "/tmp/out.mp4", audio_path="/tmp/global.mp3"
-        )
+        cmd = engine._build_multi_panel_cmd([panel], "/tmp/out.mp4", audio_path="/tmp/global.mp3")
 
         # Global audio should NOT appear in the command
         assert "/tmp/global.mp3" not in cmd

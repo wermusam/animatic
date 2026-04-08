@@ -126,9 +126,7 @@ class AnimaticEngine:
             startupinfo = subprocess.STARTUPINFO()
             startupinfo.dwFlags |= subprocess.STARTF_USESHOWWINDOW
 
-        subprocess.run(
-            cmd, check=True, startupinfo=startupinfo, stdin=subprocess.DEVNULL
-        )
+        subprocess.run(cmd, check=True, startupinfo=startupinfo, stdin=subprocess.DEVNULL)
         elapsed = time.time() - start
         print(f"Render time: {elapsed:.2f} seconds")
 
@@ -166,9 +164,7 @@ class AnimaticEngine:
         panel_audio_inputs: dict[int, int] = {}
 
         for i, panel in enumerate(panels):
-            cmd.extend(
-                ["-loop", "1", "-t", str(panel.duration), "-i", panel.image_path]
-            )
+            cmd.extend(["-loop", "1", "-t", str(panel.duration), "-i", panel.image_path])
             panel_video_inputs.append(input_idx)
             input_idx += 1
 
@@ -217,14 +213,10 @@ class AnimaticEngine:
                 concat_inputs.append(f"[{vlabel}]")
 
         if has_per_panel_audio:
-            concat_str = (
-                "".join(concat_inputs) + f"concat=n={len(panels)}:v=1:a=1[outv][outa]"
-            )
+            concat_str = "".join(concat_inputs) + f"concat=n={len(panels)}:v=1:a=1[outv][outa]"
             filter_parts.append(concat_str)
         else:
-            concat_str = (
-                "".join(concat_inputs) + f"concat=n={len(panels)}:v=1:a=0[outv]"
-            )
+            concat_str = "".join(concat_inputs) + f"concat=n={len(panels)}:v=1:a=0[outv]"
             filter_parts.append(concat_str)
 
         cmd.extend(["-filter_complex", ";".join(filter_parts)])
