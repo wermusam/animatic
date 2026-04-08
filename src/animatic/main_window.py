@@ -310,6 +310,12 @@ class AnimaticCreator(QMainWindow):
         self.save_btn.clicked.connect(self._save_project)
         import_row.addWidget(self.save_btn)
 
+        self.export_script_btn = QPushButton("\U0001f4dd Export Script")
+        self.export_script_btn.setObjectName("ImportBtn")
+        self.export_script_btn.setToolTip("Export all dialogue to a text file")
+        self.export_script_btn.clicked.connect(self._export_script)
+        import_row.addWidget(self.export_script_btn)
+
         import_row.addStretch()
         layout.addLayout(import_row)
 
@@ -975,7 +981,10 @@ class AnimaticCreator(QMainWindow):
             self._update_button_states()
 
     def _toggle_recording(self) -> None:
-        """Start or stop audio recording for the selected panel."""
+        """Start or stop audio recording for the selected panel.
+
+        If the panel already has audio, it will be replaced.
+        """
         if self._recorder is not None:
             self._stop_recording()
             return
@@ -984,6 +993,12 @@ class AnimaticCreator(QMainWindow):
         if current is None:
             QMessageBox.warning(self, "Error", "Select a panel first!")
             return
+
+        # Clear existing audio so re-recording just works
+        panel_id = current.data(Qt.ItemDataRole.UserRole)
+        panel = self._find_panel(panel_id)
+        if panel and panel.audio_path:
+            panel.audio_path = None
 
         try:
             from PySide6.QtMultimedia import (
@@ -1196,6 +1211,43 @@ class AnimaticCreator(QMainWindow):
         self.export_btn.setText("Export Video")
         QMessageBox.critical(self, "Error", f"Export failed:\n{error}")
         self._restore_display()
+
+    def _export_script(self) -> None:
+        """Export all panel dialogue to a text file."""
+        if not self.project.panels:
+            QMessageBox.warning(self, "Error", "Add some panels first!")
+            return
+
+        has_dialogue = any(p.dialogue for p in self.project.panels)
+        if not has_dialogue:
+            QMessageBox.warning(
+                self, "Error", "No dialogue to export. Type dialogue in the Dialogue field."
+            )
+            return
+
+        path, _ = QFileDialog.getSaveFileName(
+            self, "Export Script", "", "Text Files (*.txt);;All Files (*)"
+        )
+        if not path:
+            return
+
+        with open(path, "w", encoding="utf-8") as f:
+            f.write("ANIMATIC SCRIPT\n")
+            f.write("=" * 40 + "\n\n")
+            for i, panel in enumerate(self.project.panels, 1):
+                f.write(f"Panel {i}")
+                if panel.duration:
+                    f.write(f"  ({panel.duration}s)")
+                f.write("\n")
+                if panel.dialogue:
+                    f.write(f'  "{panel.dialogue}"\n')
+                else:
+                    f.write("  (no dialogue)\n")
+                if panel.notes:
+                    f.write(f"  Notes: {panel.notes}\n")
+                f.write("\n")
+
+        QMessageBox.information(self, "Done", f"Script exported to:\n{path}")
 
     def _restore_display(self) -> None:
         """Restore the panel image after export."""
