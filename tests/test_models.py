@@ -187,7 +187,7 @@ class TestProjectSaveLoad:
         p1 = project.add_panel("/tmp/a.png", duration=2.0)
         p1.notes = "Opening shot"
         p1.audio_path = "/tmp/narration.mp3"
-        p2 = project.add_panel("/tmp/b.png", duration=4.0)
+        project.add_panel("/tmp/b.png", duration=4.0)
         project.audio_path = "/tmp/music.mp3"
         project.output_path = "/tmp/output.mp4"
 

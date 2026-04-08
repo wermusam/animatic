@@ -4,7 +4,6 @@ Builds and executes FFmpeg commands to stitch storyboard images
 and audio into MP4 video files.
 """
 
-import json
 import os
 import subprocess
 import time
@@ -45,8 +44,11 @@ class AnimaticEngine:
                 startupinfo = subprocess.STARTUPINFO()
                 startupinfo.dwFlags |= subprocess.STARTF_USESHOWWINDOW
             result = subprocess.run(
-                cmd, capture_output=True, text=True,
-                startupinfo=startupinfo, stdin=subprocess.DEVNULL,
+                cmd,
+                capture_output=True,
+                text=True,
+                startupinfo=startupinfo,
+                stdin=subprocess.DEVNULL,
             )
             # ffmpeg prints duration info to stderr
             output = result.stderr
@@ -164,7 +166,9 @@ class AnimaticEngine:
         panel_audio_inputs: dict[int, int] = {}
 
         for i, panel in enumerate(panels):
-            cmd.extend(["-loop", "1", "-t", str(panel.duration), "-i", panel.image_path])
+            cmd.extend(
+                ["-loop", "1", "-t", str(panel.duration), "-i", panel.image_path]
+            )
             panel_video_inputs.append(input_idx)
             input_idx += 1
 
@@ -214,14 +218,12 @@ class AnimaticEngine:
 
         if has_per_panel_audio:
             concat_str = (
-                "".join(concat_inputs)
-                + f"concat=n={len(panels)}:v=1:a=1[outv][outa]"
+                "".join(concat_inputs) + f"concat=n={len(panels)}:v=1:a=1[outv][outa]"
             )
             filter_parts.append(concat_str)
         else:
             concat_str = (
-                "".join(concat_inputs)
-                + f"concat=n={len(panels)}:v=1:a=0[outv]"
+                "".join(concat_inputs) + f"concat=n={len(panels)}:v=1:a=0[outv]"
             )
             filter_parts.append(concat_str)
 
@@ -234,10 +236,15 @@ class AnimaticEngine:
         elif global_audio_idx is not None:
             cmd.extend(["-map", f"{global_audio_idx}:a", "-c:a", "copy", "-shortest"])
 
-        cmd.extend([
-            "-c:v", "libx264",
-            "-preset", "ultrafast",
-            "-pix_fmt", "yuv420p",
-            output_path,
-        ])
+        cmd.extend(
+            [
+                "-c:v",
+                "libx264",
+                "-preset",
+                "ultrafast",
+                "-pix_fmt",
+                "yuv420p",
+                output_path,
+            ]
+        )
         return cmd
