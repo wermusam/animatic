@@ -25,6 +25,7 @@ class Panel:
         self.duration: float = duration
         self.panel_id: str = uuid.uuid4().hex[:8]
         self.audio_path: Optional[str] = None
+        self.dialogue: str = ""
         self.notes: str = ""
 
     def __repr__(self) -> str:
@@ -41,6 +42,7 @@ class Panel:
             "duration": self.duration,
             "panel_id": self.panel_id,
             "audio_path": self.audio_path,
+            "dialogue": self.dialogue,
             "notes": self.notes,
         }
 
@@ -57,6 +59,7 @@ class Panel:
         panel = cls(image_path=data["image_path"], duration=data.get("duration", 3.0))
         panel.panel_id = data.get("panel_id", panel.panel_id)
         panel.audio_path = data.get("audio_path")
+        panel.dialogue = data.get("dialogue", "")
         panel.notes = data.get("notes", "")
         return panel
 
@@ -112,6 +115,7 @@ class Project:
             if p.panel_id == panel_id:
                 new_panel = Panel(image_path=p.image_path, duration=p.duration)
                 new_panel.audio_path = p.audio_path
+                new_panel.dialogue = p.dialogue
                 new_panel.notes = p.notes
                 self.panels.insert(i + 1, new_panel)
                 return new_panel

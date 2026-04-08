@@ -974,3 +974,106 @@ class TestRound2BugFixes:
         assert hasattr(window, "_notes_undo_timer")
         assert window._notes_undo_timer.isSingleShot()
         assert window._notes_undo_timer.interval() == 500
+
+
+class TestDialogueNotesFeature:
+    """Tests for the dialogue/notes split and subtitle export features."""
+
+    def test_dialogue_field_exists_on_panel(self) -> None:
+        """Panel model should have separate dialogue and notes fields."""
+        from animatic.models import Panel
+
+        p = Panel("/tmp/test.png")
+        assert p.dialogue == ""
+        assert p.notes == ""
+        p.dialogue = "Hello world"
+        p.notes = "Make this angrier"
+        assert p.dialogue == "Hello world"
+        assert p.notes == "Make this angrier"
+
+    def test_dialogue_serialization_roundtrip(self) -> None:
+        """Dialogue and notes should both survive to_dict/from_dict."""
+        from animatic.models import Panel
+
+        p = Panel("/tmp/test.png")
+        p.dialogue = "I won't let you leave!"
+        p.notes = "Try shorter pause"
+        data = p.to_dict()
+        assert data["dialogue"] == "I won't let you leave!"
+        assert data["notes"] == "Try shorter pause"
+
+        restored = Panel.from_dict(data)
+        assert restored.dialogue == "I won't let you leave!"
+        assert restored.notes == "Try shorter pause"
+
+    def test_dialogue_input_exists(self, window: AnimaticCreator) -> None:
+        """Window should have separate dialogue_input and notes_input."""
+        assert hasattr(window, "dialogue_input")
+        assert hasattr(window, "notes_input")
+        assert "Dialogue" in window.dialogue_input.placeholderText()
+        assert "Notes" in window.notes_input.placeholderText()
+
+    def test_dialogue_updates_label(self, window: AnimaticCreator, temp_images: list[str]) -> None:
+        """Typing in dialogue_input should update the dialogue_label."""
+        event, _mime = _make_drop_event([temp_images[0]])
+        window.dropEvent(event)
+        window.panel_strip.setCurrentRow(0)
+
+        window.dialogue_input.setText("Hello world")
+        assert window.dialogue_label.text() == "Hello world"
+
+    def test_burn_dialogue_checkbox_exists(self, window: AnimaticCreator) -> None:
+        """Burn dialogue checkbox should exist and default to checked."""
+        assert hasattr(window, "burn_dialogue_cb")
+        assert window.burn_dialogue_cb.isChecked()
+
+    def test_record_button_exists(self, window: AnimaticCreator) -> None:
+        """Record button should exist in the UI."""
+        assert hasattr(window, "record_btn")
+        assert "Record" in window.record_btn.text()
+
+
+class TestDrawtextEngine:
+    """Tests for the FFmpeg drawtext subtitle burning."""
+
+    def test_drawtext_included_when_burn_on(self) -> None:
+        """FFmpeg command should include drawtext when burn_dialogue=True."""
+        from animatic.engine import AnimaticEngine
+        from animatic.models import Panel
+
+        engine = AnimaticEngine()
+        p = Panel("/tmp/test.png", duration=2.0)
+        p.dialogue = "Hello"
+        cmd = engine._build_multi_panel_cmd([p], "/tmp/out.mp4", None, burn_dialogue=True)
+        cmd_str = " ".join(cmd)
+        assert "drawtext" in cmd_str
+
+    def test_no_drawtext_when_burn_off(self) -> None:
+        """FFmpeg command should NOT include drawtext when burn_dialogue=False."""
+        from animatic.engine import AnimaticEngine
+        from animatic.models import Panel
+
+        engine = AnimaticEngine()
+        p = Panel("/tmp/test.png", duration=2.0)
+        p.dialogue = "Hello"
+        cmd = engine._build_multi_panel_cmd([p], "/tmp/out.mp4", None, burn_dialogue=False)
+        cmd_str = " ".join(cmd)
+        assert "drawtext" not in cmd_str
+
+    def test_no_drawtext_when_dialogue_empty(self) -> None:
+        """FFmpeg command should skip drawtext for panels with empty dialogue."""
+        from animatic.engine import AnimaticEngine
+        from animatic.models import Panel
+
+        engine = AnimaticEngine()
+        p = Panel("/tmp/test.png", duration=2.0)
+        p.dialogue = ""
+        cmd = engine._build_multi_panel_cmd([p], "/tmp/out.mp4", None, burn_dialogue=True)
+        cmd_str = " ".join(cmd)
+        assert "drawtext" not in cmd_str
+
+    def test_escape_special_characters(self) -> None:
+        """Special characters in dialogue should be escaped for FFmpeg."""
+        from animatic.engine import AnimaticEngine
+
+        assert "\\\\:" in AnimaticEngine._escape_drawtext("Hello: world")
