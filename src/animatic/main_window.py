@@ -233,6 +233,7 @@ class AnimaticCreator(QMainWindow):
         super().__init__()
         self.setWindowTitle("Storyboard Animatic")
         self.resize(900, 700)
+        self.setMinimumSize(600, 500)
         self.setAcceptDrops(True)
 
         self.project = Project()
@@ -260,11 +261,18 @@ class AnimaticCreator(QMainWindow):
 
     def _setup_ui(self) -> None:
         """Build the GUI layout."""
+        from PySide6.QtWidgets import QScrollArea
+
+        scroll = QScrollArea()
+        scroll.setWidgetResizable(True)
+        scroll.setFrameShape(QScrollArea.Shape.NoFrame)
+        self.setCentralWidget(scroll)
+
         central = QWidget()
-        self.setCentralWidget(central)
+        scroll.setWidget(central)
         layout = QVBoxLayout(central)
-        layout.setSpacing(12)
-        layout.setContentsMargins(30, 20, 30, 20)
+        layout.setSpacing(8)
+        layout.setContentsMargins(20, 12, 20, 12)
 
         # Title
         self.title_label = QLabel("Storyboard Animatic")
@@ -276,7 +284,7 @@ class AnimaticCreator(QMainWindow):
         self.main_display = QLabel("Drop images here or click Add Images")
         self.main_display.setAlignment(Qt.AlignmentFlag.AlignCenter)
         self.main_display.setObjectName("MainDisplay")
-        self.main_display.setMinimumHeight(350)
+        self.main_display.setMinimumHeight(200)
         self.main_display.setScaledContents(False)
         layout.addWidget(self.main_display, stretch=1)
 
