@@ -154,9 +154,7 @@ class PreviewPlayer(QObject):
                 if self._per_panel_audio and panel.audio_path:
                     new_source = QUrl.fromLocalFile(panel.audio_path)
                     if self._audio_player.source() == new_source:
-                        self._audio_player.setPosition(
-                            int(self._elapsed_in_panel * 1000)
-                        )
+                        self._audio_player.setPosition(int(self._elapsed_in_panel * 1000))
                     else:
                         self._audio_player.stop()
                         self._pending_play = False

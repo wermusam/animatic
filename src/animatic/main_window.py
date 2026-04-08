@@ -10,6 +10,12 @@ import sys
 from datetime import datetime
 from typing import Optional
 
+from PySide6.QtCore import QEvent, QObject, QSize, Qt, QThread, QTimer, Signal
+from PySide6.QtGui import (
+    QDragEnterEvent,
+    QDropEvent,
+    QPixmap,
+)
 from PySide6.QtWidgets import (
     QApplication,
     QDoubleSpinBox,
@@ -27,12 +33,6 @@ from PySide6.QtWidgets import (
     QStyle,
     QVBoxLayout,
     QWidget,
-)
-from PySide6.QtCore import QEvent, QObject, QSize, Qt, QThread, QTimer, Signal
-from PySide6.QtGui import (
-    QDragEnterEvent,
-    QDropEvent,
-    QPixmap,
 )
 
 from animatic.engine import AnimaticEngine
@@ -396,9 +396,7 @@ class AnimaticCreator(QMainWindow):
         # Output row
         output_row = QHBoxLayout()
         self.output_path_input = QLineEdit()
-        self.output_path_input.setPlaceholderText(
-            "Save location (auto-generated or browse)"
-        )
+        self.output_path_input.setPlaceholderText("Save location (auto-generated or browse)")
         self.output_path_input.setObjectName("InputBox")
         output_row.addWidget(self.output_path_input)
 
@@ -511,9 +509,7 @@ class AnimaticCreator(QMainWindow):
         # Select the newly added panel
         self.panel_strip.setCurrentItem(item)
 
-    def _cache_panel_pixmap(
-        self, panel: Panel, pixmap: Optional[QPixmap] = None
-    ) -> None:
+    def _cache_panel_pixmap(self, panel: Panel, pixmap: Optional[QPixmap] = None) -> None:
         """Cache the original full-size pixmap for a panel.
 
         The pixmap is scaled to fit the display each time it's shown,
@@ -562,9 +558,7 @@ class AnimaticCreator(QMainWindow):
             self.notes_input.blockSignals(False)
 
             if panel.audio_path:
-                self.panel_audio_label.setText(
-                    f"Panel Audio: {os.path.basename(panel.audio_path)}"
-                )
+                self.panel_audio_label.setText(f"Panel Audio: {os.path.basename(panel.audio_path)}")
             else:
                 self.panel_audio_label.setText("Panel Audio: None")
 
@@ -766,10 +760,7 @@ class AnimaticCreator(QMainWindow):
             target_time = (value / 1000.0) * total
             cumulative = 0.0
             for i, panel in enumerate(self.project.panels):
-                if (
-                    cumulative + panel.duration > target_time
-                    or i == len(self.project.panels) - 1
-                ):
+                if cumulative + panel.duration > target_time or i == len(self.project.panels) - 1:
                     self._show_panel_image(panel, target_time)
                     self.timecode_label.setText(self._format_time(target_time))
                     self._update_status_bar(target_time, playing=False)
@@ -786,10 +777,7 @@ class AnimaticCreator(QMainWindow):
         # Find which panel this time falls in
         cumulative = 0.0
         for i, panel in enumerate(self.project.panels):
-            if (
-                cumulative + panel.duration > target_time
-                or i == len(self.project.panels) - 1
-            ):
+            if cumulative + panel.duration > target_time or i == len(self.project.panels) - 1:
                 self._show_panel_image(panel, target_time)
                 self.timecode_label.setText(self._format_time(target_time))
                 self._update_status_bar(target_time, playing=False)
@@ -1117,9 +1105,7 @@ class AnimaticCreator(QMainWindow):
 
     def _browse_audio(self) -> None:
         """Open a file dialog to select an audio file for the selected panel."""
-        path, _ = QFileDialog.getOpenFileName(
-            self, "Select Audio", "", "Audio (*.mp3 *.wav)"
-        )
+        path, _ = QFileDialog.getOpenFileName(self, "Select Audio", "", "Audio (*.mp3 *.wav)")
         if path:
             self._set_audio(path)
 
@@ -1165,9 +1151,7 @@ class AnimaticCreator(QMainWindow):
 
     def browse_output_path(self) -> None:
         """Open a save dialog for the user to choose the output path."""
-        path, _ = QFileDialog.getSaveFileName(
-            self, "Save Video As", "", "MP4 Files (*.mp4)"
-        )
+        path, _ = QFileDialog.getSaveFileName(self, "Save Video As", "", "MP4 Files (*.mp4)")
         if path:
             self.project.output_path = path
             self.output_path_input.setText(path)
