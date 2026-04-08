@@ -266,7 +266,11 @@ class AnimaticCreator(QMainWindow):
         scroll = QScrollArea()
         scroll.setWidgetResizable(True)
         scroll.setFrameShape(QScrollArea.Shape.NoFrame)
-        scroll.setStyleSheet("QScrollArea { background-color: #1e1e1e; border: none; }")
+        scroll.setStyleSheet(
+            "QScrollArea { background-color: #1e1e1e; border: none; }"
+            "QScrollArea > QWidget > QWidget { background-color: #1e1e1e; }"
+            "QWidget { background-color: #1e1e1e; }"
+        )
         self.setCentralWidget(scroll)
 
         central = QWidget()
