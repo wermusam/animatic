@@ -15,6 +15,7 @@ from PySide6.QtCore import QEvent, QObject, QSize, Qt, QThread, QTimer, Signal
 from PySide6.QtGui import (
     QDragEnterEvent,
     QDropEvent,
+    QImageReader,
     QPixmap,
 )
 from PySide6.QtWidgets import (
@@ -40,6 +41,16 @@ from PySide6.QtWidgets import (
 from animatic.engine import AnimaticEngine
 from animatic.models import Panel, Project
 from animatic.player import PreviewPlayer
+
+
+def _load_pixmap(path: str) -> QPixmap:
+    """Load a QPixmap with EXIF rotation applied (handles phone photos)."""
+    reader = QImageReader(path)
+    reader.setAutoTransform(True)
+    image = reader.read()
+    if image.isNull():
+        return QPixmap()
+    return QPixmap.fromImage(image)
 
 
 class ExportThread(QThread):
@@ -228,7 +239,7 @@ class AnimaticCreator(QMainWindow):
 
     def __init__(self) -> None:
         super().__init__()
-        self.setWindowTitle("Storyboard Animatic")
+        self.setWindowTitle("\U0001f3ac Storyboard Animatic")
         self.resize(900, 700)
         self.setMinimumSize(600, 500)
         self.setAcceptDrops(True)
@@ -265,7 +276,7 @@ class AnimaticCreator(QMainWindow):
         layout.setContentsMargins(12, 8, 12, 8)
 
         # Title
-        self.title_label = QLabel("Storyboard Animatic")
+        self.title_label = QLabel("\U0001f3ac Storyboard Animatic")
         self.title_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
         self.title_label.setObjectName("TitleLabel")
         layout.addWidget(self.title_label)
@@ -520,7 +531,7 @@ class AnimaticCreator(QMainWindow):
         Args:
             panel: The Panel to add.
         """
-        pixmap = QPixmap(panel.image_path)
+        pixmap = _load_pixmap(panel.image_path)
         if pixmap.isNull():
             pixmap = QPixmap(120, 80)
             pixmap.fill(Qt.GlobalColor.darkGray)
@@ -1059,7 +1070,7 @@ class AnimaticCreator(QMainWindow):
         if new_panel:
             # Insert into strip right after the current item
             row = self.panel_strip.row(current)
-            pixmap = QPixmap(new_panel.image_path)
+            pixmap = _load_pixmap(new_panel.image_path)
             if pixmap.isNull():
                 pixmap = QPixmap(120, 80)
                 pixmap.fill(Qt.GlobalColor.darkGray)
