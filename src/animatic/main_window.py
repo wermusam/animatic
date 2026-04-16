@@ -714,9 +714,16 @@ class AnimaticCreator(QMainWindow):
         else:
             if not self.project.panels:
                 return
+            selected_row = self.panel_strip.currentRow()
             if self.player.current_index() == 0 and self.player.total_elapsed() == 0.0:
                 self.player.load(self.project.panels, self.project.audio_path)
-                self._on_preview_panel_changed(0)
+                start_index = selected_row if selected_row >= 0 else 0
+                if start_index > 0:
+                    self.player.seek_to_panel(start_index)
+                self._on_preview_panel_changed(start_index)
+            elif selected_row >= 0 and selected_row != self.player.current_index():
+                self.player.seek_to_panel(selected_row)
+                self._on_preview_panel_changed(selected_row)
             self.player.play()
             self.play_btn.setText("Pause")
 
