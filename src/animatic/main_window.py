@@ -1288,6 +1288,7 @@ class AnimaticCreator(QMainWindow):
             self.panel_audio_label.setText(f"Audio: {name}")
 
         self._update_status()
+        self._update_button_states()
 
     def browse_output_path(self) -> None:
         """Open a save dialog for the user to choose the output path."""
