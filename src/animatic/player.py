@@ -44,6 +44,7 @@ class PreviewPlayer(QObject):
 
         # Audio playback
         self._audio_output = QAudioOutput(self)
+        self._audio_output.setVolume(1.0)
         self._audio_player = QMediaPlayer(self)
         self._audio_player.setAudioOutput(self._audio_output)
         self._audio_player.mediaStatusChanged.connect(self._on_media_status)
