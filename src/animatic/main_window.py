@@ -1392,14 +1392,34 @@ class AnimaticCreator(QMainWindow):
         self.output_path_input.setText(output_path)
 
     def _generate_output_path(self) -> str:
-        """Generate a timestamped output path in the first panel's directory.
+        """Generate a fun, unique output path in the first panel's directory.
 
         Returns:
-            A path like '/path/to/images/animatic_20260402_143022.mp4'.
+            A path like '/path/to/images/animatic_fart_143022.mp4'.
         """
+        import random
+
+        fun_words = [
+            "fart",
+            "boop",
+            "zoom",
+            "doodle",
+            "noodle",
+            "splat",
+            "whoosh",
+            "kapow",
+            "wiggle",
+            "zinger",
+            "squish",
+            "bonk",
+            "yeet",
+            "snazzy",
+            "wobble",
+        ]
         folder = os.path.dirname(self.project.panels[0].image_path)
-        timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-        return os.path.join(folder, f"animatic_{timestamp}.mp4")
+        timestamp = datetime.now().strftime("%H%M%S")
+        word = random.choice(fun_words)
+        return os.path.join(folder, f"animatic_{word}_{timestamp}.mp4")
 
     def _apply_styles(self) -> None:
         """Apply the dark theme stylesheet."""
