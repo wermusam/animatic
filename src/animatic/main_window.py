@@ -56,7 +56,6 @@ class ExportThread(QThread):
         output_path: str,
         audio_path: str | None = None,
         total_duration: float = 0.0,
-        burn_dialogue: bool = False,
         burn_notes: bool = False,
     ) -> None:
         super().__init__()
@@ -65,7 +64,6 @@ class ExportThread(QThread):
         self.output_path = output_path
         self.audio_path = audio_path
         self.total_duration = total_duration
-        self.burn_dialogue = burn_dialogue
         self.burn_notes = burn_notes
 
     def run(self) -> None:
@@ -78,7 +76,6 @@ class ExportThread(QThread):
                 self.panels,
                 self.output_path,
                 self.audio_path,
-                burn_dialogue=self.burn_dialogue,
                 burn_notes=self.burn_notes,
             )
 
@@ -299,39 +296,33 @@ class AnimaticCreator(QMainWindow):
         import_row.addWidget(self.add_images_btn)
 
         self.add_audio_btn = QPushButton("\U0001f50a Add Audio")
-        self.add_audio_btn.setObjectName("AudioImportBtn")
+        self.add_audio_btn.setObjectName("ImportBtn")
         self.add_audio_btn.clicked.connect(self._browse_audio)
         import_row.addWidget(self.add_audio_btn)
 
-        self.record_btn = QPushButton("\U0001f3a4 Record")
-        self.record_btn.setObjectName("AudioImportBtn")
+        self.record_btn = QPushButton("\U0001f534 Record")
+        self.record_btn.setObjectName("RecordBtn")
         self.record_btn.setToolTip("Record audio from microphone for the selected panel")
         self.record_btn.clicked.connect(self._toggle_recording)
         import_row.addWidget(self.record_btn)
 
         self.save_btn = QPushButton("\U0001f4be Save Project")
-        self.save_btn.setObjectName("ImportBtn")
+        self.save_btn.setObjectName("UtilityBtn")
         self.save_btn.clicked.connect(self._save_project)
         import_row.addWidget(self.save_btn)
 
         self.load_btn = QPushButton("\U0001f4c2 Load Project")
-        self.load_btn.setObjectName("ImportBtn")
+        self.load_btn.setObjectName("UtilityBtn")
         self.load_btn.setToolTip("Open a saved .animatic project file")
         self.load_btn.clicked.connect(self._browse_load_project)
         import_row.addWidget(self.load_btn)
-
-        self.export_script_btn = QPushButton("\U0001f4dd Export Script")
-        self.export_script_btn.setObjectName("ImportBtn")
-        self.export_script_btn.setToolTip("Export all dialogue to a text file")
-        self.export_script_btn.clicked.connect(self._export_script)
-        import_row.addWidget(self.export_script_btn)
 
         import_row.addStretch()
         layout.addLayout(import_row)
 
         # Panel strip
         self.panel_strip = PanelStrip()
-        self.panel_strip.setFixedHeight(80)
+        self.panel_strip.setFixedHeight(110)
         self.panel_strip.currentItemChanged.connect(self._on_panel_selected)
         self.panel_strip.model().rowsMoved.connect(self._on_panels_reordered)
         layout.addWidget(self.panel_strip)
@@ -365,9 +356,8 @@ class AnimaticCreator(QMainWindow):
         self.panel_audio_label.setObjectName("AudioLabel")
         controls.addWidget(self.panel_audio_label)
 
-        self.remove_audio_btn = QPushButton("\u2715")
+        self.remove_audio_btn = QPushButton("\U0001f5d1 Remove Audio")
         self.remove_audio_btn.setObjectName("RemoveBtn")
-        self.remove_audio_btn.setFixedWidth(30)
         self.remove_audio_btn.setToolTip("Remove audio from this panel")
         self.remove_audio_btn.clicked.connect(self._remove_panel_audio)
         controls.addWidget(self.remove_audio_btn)
@@ -378,16 +368,9 @@ class AnimaticCreator(QMainWindow):
 
         layout.addLayout(controls)
 
-        # Dialogue field (shown as subtitle in preview and export)
-        self.dialogue_input = QLineEdit()
-        self.dialogue_input.setPlaceholderText("Dialogue (shown as subtitle in export)...")
-        self.dialogue_input.setObjectName("InputBox")
-        self.dialogue_input.textChanged.connect(self._on_dialogue_changed)
-        layout.addWidget(self.dialogue_input)
-
-        # Notes field (director-only, never exported)
+        # Notes field (shown in preview, optionally burned into export)
         self.notes_input = QLineEdit()
-        self.notes_input.setPlaceholderText("Notes (director only, not in export)...")
+        self.notes_input.setPlaceholderText("Notes for this panel (action, dialogue, direction)...")
         self.notes_input.setObjectName("InputBox")
         self.notes_input.textChanged.connect(self._on_notes_changed)
         layout.addWidget(self.notes_input)
@@ -461,17 +444,11 @@ class AnimaticCreator(QMainWindow):
         # Export row: checkbox + button
         export_row = QHBoxLayout()
 
-        self.burn_dialogue_cb = QCheckBox("Burn dialogue into export")
-        self.burn_dialogue_cb.setChecked(True)
-        self.burn_dialogue_cb.setToolTip(
-            "When checked, dialogue text appears as subtitles in the exported video"
-        )
-        export_row.addWidget(self.burn_dialogue_cb)
-
         self.burn_notes_cb = QCheckBox("Burn notes into export")
-        self.burn_notes_cb.setChecked(False)
+        self.burn_notes_cb.setChecked(True)
         self.burn_notes_cb.setToolTip(
-            "When checked, director notes appear at the top of the exported video"
+            "When checked, panel notes appear as subtitles in the exported video. "
+            "Uncheck for a clean version without text."
         )
         export_row.addWidget(self.burn_notes_cb)
 
@@ -611,10 +588,7 @@ class AnimaticCreator(QMainWindow):
             self.timecode_label.setText(self._format_time(elapsed))
             self._update_status_bar(elapsed, playing=False)
 
-            # Populate dialogue and notes fields
-            self.dialogue_input.blockSignals(True)
-            self.dialogue_input.setText(panel.dialogue)
-            self.dialogue_input.blockSignals(False)
+            # Populate notes field
             self.notes_input.blockSignals(True)
             self.notes_input.setText(panel.notes)
             self.notes_input.blockSignals(False)
@@ -724,7 +698,7 @@ class AnimaticCreator(QMainWindow):
             Qt.TransformationMode.SmoothTransformation,
         )
         self.main_display.setPixmap(display)
-        self.dialogue_label.setText(panel.dialogue if panel.dialogue else "")
+        self.dialogue_label.setText(panel.notes if panel.notes else "")
 
     # -- Preview Playback --
 
@@ -761,9 +735,6 @@ class AnimaticCreator(QMainWindow):
             panel = self.project.panels[index]
             self._show_panel_image(panel, self.player.total_elapsed())
             self.panel_strip.setCurrentRow(index)
-            self.dialogue_input.blockSignals(True)
-            self.dialogue_input.setText(panel.dialogue)
-            self.dialogue_input.blockSignals(False)
             self.notes_input.blockSignals(True)
             self.notes_input.setText(panel.notes)
             self.notes_input.blockSignals(False)
@@ -886,7 +857,8 @@ class AnimaticCreator(QMainWindow):
             key = event.key()
             mods = event.modifiers()
             ctrl = bool(mods & Qt.KeyboardModifier.ControlModifier)
-            in_text = isinstance(obj, (QLineEdit, QDoubleSpinBox))
+            focused = QApplication.focusWidget()
+            in_text = isinstance(focused, (QLineEdit, QDoubleSpinBox))
 
             # Ctrl+Z: undo, Ctrl+Shift+Z: redo
             shift = bool(mods & Qt.KeyboardModifier.ShiftModifier)
@@ -934,18 +906,6 @@ class AnimaticCreator(QMainWindow):
 
     # -- New Feature Handlers --
 
-    def _on_dialogue_changed(self, text: str) -> None:
-        """Update the selected panel's dialogue when the text field changes."""
-        current = self.panel_strip.currentItem()
-        if current is None:
-            return
-        panel_id = current.data(Qt.ItemDataRole.UserRole)
-        panel = self._find_panel(panel_id)
-        if panel:
-            panel.dialogue = text
-            self.dialogue_label.setText(text)
-            self._notes_undo_timer.start()
-
     def _on_notes_changed(self, text: str) -> None:
         """Update the selected panel's notes when the text field changes."""
         current = self.panel_strip.currentItem()
@@ -955,6 +915,7 @@ class AnimaticCreator(QMainWindow):
         panel = self._find_panel(panel_id)
         if panel:
             panel.notes = text
+            self.dialogue_label.setText(text)
             self._notes_undo_timer.start()
 
     def _push_notes_undo(self) -> None:
@@ -1047,8 +1008,11 @@ class AnimaticCreator(QMainWindow):
         self._recorder.setOutputLocation(QUrl.fromLocalFile(self._recording_path))
         self._recorder.record()
 
-        self.record_btn.setText("\u23f9 Stop")
-        self.record_btn.setStyleSheet("background-color: #cc3333; color: white;")
+        self.record_btn.setText("\u23f9 Stop Recording")
+        self.record_btn.setStyleSheet(
+            "background-color: #cc3333; color: white; border: 2px solid #ff6666;"
+            "border-radius: 5px; padding: 8px 16px; font-size: 14px; font-weight: bold;"
+        )
 
     def _stop_recording(self) -> None:
         """Stop recording and assign the audio to the selected panel."""
@@ -1065,7 +1029,7 @@ class AnimaticCreator(QMainWindow):
             self._audio_input.deleteLater()
             self._audio_input = None
 
-        self.record_btn.setText("\U0001f3a4 Record")
+        self.record_btn.setText("\U0001f534 Record")
         self.record_btn.setStyleSheet("")
 
         if self._recording_path and os.path.exists(self._recording_path):
@@ -1210,7 +1174,6 @@ class AnimaticCreator(QMainWindow):
             output_path,
             self.project.audio_path,
             total_duration=self.project.total_duration(),
-            burn_dialogue=self.burn_dialogue_cb.isChecked(),
             burn_notes=self.burn_notes_cb.isChecked(),
         )
         self._export_thread.progress.connect(self._on_export_progress)
@@ -1238,43 +1201,6 @@ class AnimaticCreator(QMainWindow):
         self.export_btn.setText("Export Video")
         QMessageBox.critical(self, "Error", f"Export failed:\n{error}")
         self._restore_display()
-
-    def _export_script(self) -> None:
-        """Export all panel dialogue to a text file."""
-        if not self.project.panels:
-            QMessageBox.warning(self, "Error", "Add some panels first!")
-            return
-
-        has_dialogue = any(p.dialogue for p in self.project.panels)
-        if not has_dialogue:
-            QMessageBox.warning(
-                self, "Error", "No dialogue to export. Type dialogue in the Dialogue field."
-            )
-            return
-
-        path, _ = QFileDialog.getSaveFileName(
-            self, "Export Script", "", "Text Files (*.txt);;All Files (*)"
-        )
-        if not path:
-            return
-
-        with open(path, "w", encoding="utf-8") as f:
-            f.write("ANIMATIC SCRIPT\n")
-            f.write("=" * 40 + "\n\n")
-            for i, panel in enumerate(self.project.panels, 1):
-                f.write(f"Panel {i}")
-                if panel.duration:
-                    f.write(f"  ({panel.duration}s)")
-                f.write("\n")
-                if panel.dialogue:
-                    f.write(f'  "{panel.dialogue}"\n')
-                else:
-                    f.write("  (no dialogue)\n")
-                if panel.notes:
-                    f.write(f"  Notes: {panel.notes}\n")
-                f.write("\n")
-
-        QMessageBox.information(self, "Done", f"Script exported to:\n{path}")
 
     def _restore_display(self) -> None:
         """Restore the panel image after export."""
@@ -1421,6 +1347,7 @@ class AnimaticCreator(QMainWindow):
             if panel and panel.audio_path:
                 has_audio = True
         self.remove_audio_btn.setEnabled(has_audio)
+        self.remove_audio_btn.setVisible(has_audio)
 
     def _set_default_output_path(self) -> None:
         """Set a default output path if none is set."""
@@ -1463,8 +1390,10 @@ class AnimaticCreator(QMainWindow):
             QPushButton#RemoveBtn:hover {{ background-color: #442222; }}
             QPushButton#ImportBtn {{ background-color: #2d2d2d; border: 2px solid #448844; border-radius: 5px; padding: 8px 16px; color: #66ff66; font-size: 14px; font-weight: bold; }}
             QPushButton#ImportBtn:hover {{ background-color: #224422; }}
-            QPushButton#AudioImportBtn {{ background-color: #2d2d2d; border: 2px solid #446688; border-radius: 5px; padding: 8px 16px; color: #33ccff; font-size: 14px; font-weight: bold; }}
-            QPushButton#AudioImportBtn:hover {{ background-color: #223344; }}
+            QPushButton#RecordBtn {{ background-color: #2d2d2d; border: 2px solid #cc3333; border-radius: 5px; padding: 8px 16px; color: #ff6666; font-size: 14px; font-weight: bold; }}
+            QPushButton#RecordBtn:hover {{ background-color: #442222; }}
+            QPushButton#UtilityBtn {{ background-color: #2d2d2d; border: 2px solid #555; border-radius: 5px; padding: 8px 16px; color: #cccccc; font-size: 14px; }}
+            QPushButton#UtilityBtn:hover {{ background-color: #3a3a3a; }}
             QListWidget {{ background-color: #2d2d2d; border: 2px solid #444; border-radius: 5px; }}
             QListWidget::item {{ padding: 4px; color: #aaa; font-size: 11px; }}
             QListWidget::item:selected {{ background-color: {accent_pink}; color: white; border-radius: 3px; }}

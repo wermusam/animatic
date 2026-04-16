@@ -1006,26 +1006,26 @@ class TestDialogueNotesFeature:
         assert restored.dialogue == "I won't let you leave!"
         assert restored.notes == "Try shorter pause"
 
-    def test_dialogue_input_exists(self, window: AnimaticCreator) -> None:
-        """Window should have separate dialogue_input and notes_input."""
-        assert hasattr(window, "dialogue_input")
+    def test_notes_input_exists(self, window: AnimaticCreator) -> None:
+        """Window should have a notes_input field but no dialogue_input."""
         assert hasattr(window, "notes_input")
-        assert "Dialogue" in window.dialogue_input.placeholderText()
+        assert not hasattr(window, "dialogue_input")
         assert "Notes" in window.notes_input.placeholderText()
 
-    def test_dialogue_updates_label(self, window: AnimaticCreator, temp_images: list[str]) -> None:
-        """Typing in dialogue_input should update the dialogue_label."""
+    def test_notes_updates_label(self, window: AnimaticCreator, temp_images: list[str]) -> None:
+        """Typing in notes_input should update the dialogue_label preview."""
         event, _mime = _make_drop_event([temp_images[0]])
         window.dropEvent(event)
         window.panel_strip.setCurrentRow(0)
 
-        window.dialogue_input.setText("Hello world")
+        window.notes_input.setText("Hello world")
         assert window.dialogue_label.text() == "Hello world"
 
-    def test_burn_dialogue_checkbox_exists(self, window: AnimaticCreator) -> None:
-        """Burn dialogue checkbox should exist and default to checked."""
-        assert hasattr(window, "burn_dialogue_cb")
-        assert window.burn_dialogue_cb.isChecked()
+    def test_burn_notes_checkbox_exists(self, window: AnimaticCreator) -> None:
+        """Burn notes checkbox should exist and default to checked."""
+        assert hasattr(window, "burn_notes_cb")
+        assert window.burn_notes_cb.isChecked()
+        assert not hasattr(window, "burn_dialogue_cb")
 
     def test_record_button_exists(self, window: AnimaticCreator) -> None:
         """Record button should exist in the UI."""
@@ -1037,95 +1037,46 @@ class TestDrawtextEngine:
     """Tests for the FFmpeg drawtext subtitle burning."""
 
     def test_drawtext_included_when_burn_on(self) -> None:
-        """FFmpeg command should include drawtext when burn_dialogue=True."""
+        """FFmpeg command should include drawtext when burn_notes=True."""
         from animatic.engine import AnimaticEngine
         from animatic.models import Panel
 
         engine = AnimaticEngine()
         p = Panel("/tmp/test.png", duration=2.0)
-        p.dialogue = "Hello"
-        cmd = engine._build_multi_panel_cmd([p], "/tmp/out.mp4", None, burn_dialogue=True)
+        p.notes = "Hello"
+        cmd = engine._build_multi_panel_cmd([p], "/tmp/out.mp4", None, burn_notes=True)
         cmd_str = " ".join(cmd)
         assert "drawtext" in cmd_str
 
     def test_no_drawtext_when_burn_off(self) -> None:
-        """FFmpeg command should NOT include drawtext when burn_dialogue=False."""
+        """FFmpeg command should NOT include drawtext when burn_notes=False."""
         from animatic.engine import AnimaticEngine
         from animatic.models import Panel
 
         engine = AnimaticEngine()
         p = Panel("/tmp/test.png", duration=2.0)
-        p.dialogue = "Hello"
-        cmd = engine._build_multi_panel_cmd([p], "/tmp/out.mp4", None, burn_dialogue=False)
+        p.notes = "Hello"
+        cmd = engine._build_multi_panel_cmd([p], "/tmp/out.mp4", None, burn_notes=False)
         cmd_str = " ".join(cmd)
         assert "drawtext" not in cmd_str
 
-    def test_no_drawtext_when_dialogue_empty(self) -> None:
-        """FFmpeg command should skip drawtext for panels with empty dialogue."""
+    def test_no_drawtext_when_notes_empty(self) -> None:
+        """FFmpeg command should skip drawtext for panels with empty notes."""
         from animatic.engine import AnimaticEngine
         from animatic.models import Panel
 
         engine = AnimaticEngine()
         p = Panel("/tmp/test.png", duration=2.0)
-        p.dialogue = ""
-        cmd = engine._build_multi_panel_cmd([p], "/tmp/out.mp4", None, burn_dialogue=True)
+        p.notes = ""
+        cmd = engine._build_multi_panel_cmd([p], "/tmp/out.mp4", None, burn_notes=True)
         cmd_str = " ".join(cmd)
         assert "drawtext" not in cmd_str
 
     def test_escape_special_characters(self) -> None:
-        """Special characters in dialogue should be escaped for FFmpeg."""
+        """Special characters in notes should be escaped for FFmpeg."""
         from animatic.engine import AnimaticEngine
 
         assert "\\\\:" in AnimaticEngine._escape_drawtext("Hello: world")
-
-
-class TestExportScript:
-    """Tests for the export script feature."""
-
-    def test_export_script_button_exists(self, window: AnimaticCreator) -> None:
-        """Export Script button should exist."""
-        assert hasattr(window, "export_script_btn")
-        assert "Script" in window.export_script_btn.text()
-
-    def test_export_script_writes_file(
-        self, window: AnimaticCreator, temp_images: list[str], tmp_path
-    ) -> None:
-        """Export script should write dialogue to a text file."""
-        event, _mime = _make_drop_event(temp_images[:2])
-        window.dropEvent(event)
-
-        window.project.panels[0].dialogue = "I won't let you leave!"
-        window.project.panels[1].dialogue = "Then stop me."
-        window.project.panels[0].notes = "Make angrier"
-
-        script_path = str(tmp_path / "script.txt")
-        with (
-            patch(
-                "animatic.main_window.QFileDialog.getSaveFileName",
-                return_value=(script_path, ""),
-            ),
-            patch("animatic.main_window.QMessageBox.information"),
-        ):
-            window._export_script()
-
-        assert os.path.exists(script_path)
-        content = open(script_path).read()
-        assert "I won't let you leave!" in content
-        assert "Then stop me." in content
-        assert "Make angrier" in content
-        assert "Panel 1" in content
-        assert "Panel 2" in content
-
-    def test_export_script_empty_dialogue_warns(
-        self, window: AnimaticCreator, temp_images: list[str]
-    ) -> None:
-        """Export script should warn if no panels have dialogue."""
-        event, _mime = _make_drop_event([temp_images[0]])
-        window.dropEvent(event)
-
-        with patch("animatic.main_window.QMessageBox.warning") as mock_warn:
-            window._export_script()
-            mock_warn.assert_called_once()
 
 
 class TestReRecord:
