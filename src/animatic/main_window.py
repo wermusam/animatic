@@ -1254,7 +1254,17 @@ class AnimaticCreator(QMainWindow):
         self.export_progress.setVisible(False)
         self.export_btn.setEnabled(True)
         self.export_btn.setText("Export Video")
-        QMessageBox.information(self, "Success", f"Video exported!\n{path}")
+        reply = QMessageBox.question(
+            self,
+            "Export Complete",
+            f"Video exported!\n{path}\n\nOpen it now?",
+            QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
+        )
+        if reply == QMessageBox.StandardButton.Yes:
+            from PySide6.QtCore import QUrl
+            from PySide6.QtGui import QDesktopServices
+
+            QDesktopServices.openUrl(QUrl.fromLocalFile(path))
         self._restore_display()
 
     def _on_export_error(self, error: str) -> None:
