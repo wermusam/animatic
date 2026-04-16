@@ -1419,34 +1419,13 @@ class AnimaticCreator(QMainWindow):
         self.output_path_input.setText(output_path)
 
     def _generate_output_path(self) -> str:
-        """Generate a fun, unique output path in the first panel's directory.
+        """Generate a default output path in the first panel's directory.
 
         Returns:
-            A path like '/path/to/images/animatic_fart_143022.mp4'.
+            A path like '/path/to/images/animatic_fart.mp4'.
         """
-        import random
-
-        fun_words = [
-            "fart",
-            "boop",
-            "zoom",
-            "doodle",
-            "noodle",
-            "splat",
-            "whoosh",
-            "kapow",
-            "wiggle",
-            "zinger",
-            "squish",
-            "bonk",
-            "yeet",
-            "snazzy",
-            "wobble",
-        ]
         folder = os.path.dirname(self.project.panels[0].image_path)
-        timestamp = datetime.now().strftime("%H%M%S")
-        word = random.choice(fun_words)
-        return os.path.join(folder, f"animatic_{word}_{timestamp}.mp4")
+        return os.path.join(folder, "animatic_fart.mp4")
 
     def _apply_styles(self) -> None:
         """Apply the dark theme stylesheet."""
@@ -1483,6 +1462,11 @@ class AnimaticCreator(QMainWindow):
             QMessageBox {{ background-color: #2d2d2d; }}
             QMessageBox QLabel {{ color: white; }}
             QMessageBox QPushButton {{ background-color: {accent_pink}; color: white; border-radius: 3px; padding: 5px 15px; }}
+            QMenu {{ background-color: #2d2d2d; color: white; border: 1px solid #444; padding: 4px; }}
+            QMenu::item {{ padding: 6px 24px; background-color: transparent; }}
+            QMenu::item:selected {{ background-color: {accent_pink}; color: white; }}
+            QMenu::item:disabled {{ color: #666; }}
+            QMenu::separator {{ height: 1px; background-color: #444; margin: 4px 0; }}
         """
         self.setStyleSheet(style_sheet)
 
