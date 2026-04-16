@@ -332,7 +332,7 @@ class AnimaticCreator(QMainWindow):
 
         # Panel strip
         self.panel_strip = PanelStrip()
-        self.panel_strip.setFixedHeight(110)
+        self.panel_strip.setFixedHeight(135)
         self.panel_strip.currentItemChanged.connect(self._on_panel_selected)
         self.panel_strip.model().rowsMoved.connect(self._on_panels_reordered)
         layout.addWidget(self.panel_strip)
