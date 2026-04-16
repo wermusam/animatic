@@ -197,7 +197,7 @@ class AnimaticEngine:
                 escaped = self._escape_drawtext(panels[i].notes)
                 vfilter += (
                     f",drawtext=text='{escaped}'"
-                    ":fontsize=56:fontcolor=white"
+                    ":font='Arial':fontsize=56:fontcolor=white"
                     ":borderw=4:bordercolor=black"
                     ":box=1:boxcolor=black@0.6:boxborderw=20"
                     ":x=(w-text_w)/2:y=h-th-80"
