@@ -858,7 +858,9 @@ class AnimaticCreator(QMainWindow):
             mods = event.modifiers()
             ctrl = bool(mods & Qt.KeyboardModifier.ControlModifier)
             focused = QApplication.focusWidget()
-            in_text = isinstance(focused, (QLineEdit, QDoubleSpinBox))
+            in_text = isinstance(focused, (QLineEdit, QDoubleSpinBox)) or isinstance(
+                obj, (QLineEdit, QDoubleSpinBox)
+            )
 
             # Ctrl+Z: undo, Ctrl+Shift+Z: redo
             shift = bool(mods & Qt.KeyboardModifier.ShiftModifier)
