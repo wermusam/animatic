@@ -276,7 +276,7 @@ class AnimaticCreator(QMainWindow):
         layout.setContentsMargins(12, 8, 12, 8)
 
         # Title
-        self.title_label = QLabel("\U0001f3ac Storyboard Animatic")
+        self.title_label = QLabel("\U0001f3ac Storyboard Animatic \U0001f3ac")
         self.title_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
         self.title_label.setObjectName("TitleLabel")
         layout.addWidget(self.title_label)
