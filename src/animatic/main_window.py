@@ -314,6 +314,12 @@ class AnimaticCreator(QMainWindow):
         self.save_btn.clicked.connect(self._save_project)
         import_row.addWidget(self.save_btn)
 
+        self.load_btn = QPushButton("\U0001f4c2 Load Project")
+        self.load_btn.setObjectName("ImportBtn")
+        self.load_btn.setToolTip("Open a saved .animatic project file")
+        self.load_btn.clicked.connect(self._browse_load_project)
+        import_row.addWidget(self.load_btn)
+
         self.export_script_btn = QPushButton("\U0001f4dd Export Script")
         self.export_script_btn.setObjectName("ImportBtn")
         self.export_script_btn.setToolTip("Export all dialogue to a text file")
@@ -1107,6 +1113,14 @@ class AnimaticCreator(QMainWindow):
             if not path.endswith(".animatic"):
                 path += ".animatic"
             self.project.save(path)
+
+    def _browse_load_project(self) -> None:
+        """Open a file dialog to load a .animatic project file."""
+        path, _ = QFileDialog.getOpenFileName(
+            self, "Load Project", "", "Animatic Project (*.animatic)"
+        )
+        if path:
+            self._load_project(path)
 
     def _load_project(self, path: str) -> None:
         """Load a project from a .animatic file and rebuild the UI.
