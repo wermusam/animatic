@@ -353,6 +353,7 @@ class AnimaticCreator(QMainWindow):
 
         self.panel_audio_label = QLabel("Panel Audio: None")
         self.panel_audio_label.setObjectName("AudioLabel")
+        self.panel_audio_label.setMaximumWidth(300)
         controls.addWidget(self.panel_audio_label)
 
         self.remove_audio_btn = QPushButton("Remove Audio")
@@ -593,7 +594,10 @@ class AnimaticCreator(QMainWindow):
             self.notes_input.blockSignals(False)
 
             if panel.audio_path:
-                self.panel_audio_label.setText(f"Panel Audio: {os.path.basename(panel.audio_path)}")
+                name = os.path.basename(panel.audio_path)
+                if len(name) > 25:
+                    name = name[:22] + "..."
+                self.panel_audio_label.setText(f"Audio: {name}")
             else:
                 self.panel_audio_label.setText("Panel Audio: None")
 
@@ -1262,6 +1266,8 @@ class AnimaticCreator(QMainWindow):
                 "Per-panel audio will be used instead of the global audio track during export.",
             )
         name = os.path.basename(path)
+        if len(name) > 25:
+            name = name[:22] + "..."
         duration = self.engine.get_audio_duration(path)
 
         if duration is not None:
@@ -1270,9 +1276,9 @@ class AnimaticCreator(QMainWindow):
             self.duration_spin.setValue(panel.duration)
             self.duration_spin.blockSignals(False)
             current.setText(f"{panel.duration}s")
-            self.panel_audio_label.setText(f"Panel Audio: {name} ({duration:.1f}s)")
+            self.panel_audio_label.setText(f"Audio: {name} ({duration:.1f}s)")
         else:
-            self.panel_audio_label.setText(f"Panel Audio: {name}")
+            self.panel_audio_label.setText(f"Audio: {name}")
 
         self._update_status()
 
