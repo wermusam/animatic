@@ -228,7 +228,9 @@ class AnimaticEngine:
                 escaped = self._escape_drawtext(panels[i].notes)
                 font_clause = ""
                 if font_path:
-                    font_clause = f"fontfile='{font_path}':"
+                    # Escape ':' in Windows paths so FFmpeg doesn't treat it as a separator
+                    safe_font = font_path.replace("\\", "/").replace(":", "\\:")
+                    font_clause = f"fontfile={safe_font}:"
                 vfilter += (
                     f",drawtext={font_clause}text='{escaped}'"
                     ":fontsize=48:fontcolor=white"
