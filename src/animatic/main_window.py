@@ -81,23 +81,34 @@ class ExportThread(QThread):
         """Apply EXIF rotation to each panel's image by saving a corrected copy.
 
         FFmpeg ignores EXIF orientation, so phone photos come out rotated
-        in the exported video. We detect rotation via QImageReader and save
-        a pre-rotated PNG to temp for FFmpeg to use instead.
+        in the exported video. We detect rotation via QImageReader and cache
+        a pre-rotated JPG to temp so repeated exports are fast.
         """
         for panel in self.panels:
             reader = QImageReader(panel.image_path)
             transformation = reader.transformation()
-            if transformation == 0:  # no rotation needed
+            if transformation == 0:
                 continue
+
+            # Cache key based on source path + mtime so edits invalidate
+            try:
+                mtime = int(os.path.getmtime(panel.image_path))
+            except OSError:
+                mtime = 0
+            base = os.path.splitext(os.path.basename(panel.image_path))[0]
+            temp_path = os.path.join(
+                tempfile.gettempdir(),
+                f"animatic_rot_{base}_{mtime}.jpg",
+            )
+            if os.path.exists(temp_path):
+                panel.image_path = temp_path
+                continue
+
             reader.setAutoTransform(True)
             image = reader.read()
             if image.isNull():
                 continue
-            temp_path = os.path.join(
-                tempfile.gettempdir(),
-                f"animatic_rot_{os.path.basename(panel.image_path)}.png",
-            )
-            image.save(temp_path, "PNG")
+            image.save(temp_path, "JPG", 90)
             panel.image_path = temp_path
 
     def run(self) -> None:
