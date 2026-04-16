@@ -293,31 +293,30 @@ class AnimaticCreator(QMainWindow):
         self.add_images_btn = QPushButton("\U0001f4c2 Add Images")
         self.add_images_btn.setObjectName("ImportBtn")
         self.add_images_btn.clicked.connect(self._browse_images)
-        import_row.addWidget(self.add_images_btn)
+        import_row.addWidget(self.add_images_btn, stretch=1)
 
         self.add_audio_btn = QPushButton("\U0001f50a Add Audio")
         self.add_audio_btn.setObjectName("ImportBtn")
         self.add_audio_btn.clicked.connect(self._browse_audio)
-        import_row.addWidget(self.add_audio_btn)
+        import_row.addWidget(self.add_audio_btn, stretch=1)
 
         self.record_btn = QPushButton("\U0001f534 Record")
         self.record_btn.setObjectName("RecordBtn")
         self.record_btn.setToolTip("Record audio from microphone for the selected panel")
         self.record_btn.clicked.connect(self._toggle_recording)
-        import_row.addWidget(self.record_btn)
+        import_row.addWidget(self.record_btn, stretch=1)
 
         self.save_btn = QPushButton("\U0001f4be Save Project")
-        self.save_btn.setObjectName("UtilityBtn")
+        self.save_btn.setObjectName("ProjectBtn")
         self.save_btn.clicked.connect(self._save_project)
-        import_row.addWidget(self.save_btn)
+        import_row.addWidget(self.save_btn, stretch=1)
 
         self.load_btn = QPushButton("\U0001f4c2 Load Project")
-        self.load_btn.setObjectName("UtilityBtn")
+        self.load_btn.setObjectName("ProjectBtn")
         self.load_btn.setToolTip("Open a saved .animatic project file")
         self.load_btn.clicked.connect(self._browse_load_project)
-        import_row.addWidget(self.load_btn)
+        import_row.addWidget(self.load_btn, stretch=1)
 
-        import_row.addStretch()
         layout.addLayout(import_row)
 
         # Panel strip
@@ -356,8 +355,9 @@ class AnimaticCreator(QMainWindow):
         self.panel_audio_label.setObjectName("AudioLabel")
         controls.addWidget(self.panel_audio_label)
 
-        self.remove_audio_btn = QPushButton("\U0001f5d1 Remove Audio")
+        self.remove_audio_btn = QPushButton("\U0001f5d1")
         self.remove_audio_btn.setObjectName("RemoveBtn")
+        self.remove_audio_btn.setFixedWidth(36)
         self.remove_audio_btn.setToolTip("Remove audio from this panel")
         self.remove_audio_btn.clicked.connect(self._remove_panel_audio)
         controls.addWidget(self.remove_audio_btn)
@@ -1392,8 +1392,8 @@ class AnimaticCreator(QMainWindow):
             QPushButton#ImportBtn:hover {{ background-color: #224422; }}
             QPushButton#RecordBtn {{ background-color: #2d2d2d; border: 2px solid #cc3333; border-radius: 5px; padding: 8px 16px; color: #ff6666; font-size: 14px; font-weight: bold; }}
             QPushButton#RecordBtn:hover {{ background-color: #442222; }}
-            QPushButton#UtilityBtn {{ background-color: #2d2d2d; border: 2px solid #555; border-radius: 5px; padding: 8px 16px; color: #cccccc; font-size: 14px; }}
-            QPushButton#UtilityBtn:hover {{ background-color: #3a3a3a; }}
+            QPushButton#ProjectBtn {{ background-color: #2d2d2d; border: 2px solid {accent_pink}; border-radius: 5px; padding: 8px 16px; color: {accent_pink}; font-size: 14px; font-weight: bold; }}
+            QPushButton#ProjectBtn:hover {{ background-color: #4a1a2a; }}
             QListWidget {{ background-color: #2d2d2d; border: 2px solid #444; border-radius: 5px; }}
             QListWidget::item {{ padding: 4px; color: #aaa; font-size: 11px; }}
             QListWidget::item:selected {{ background-color: {accent_pink}; color: white; border-radius: 3px; }}
