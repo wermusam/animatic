@@ -77,12 +77,39 @@ class ExportThread(QThread):
         self.total_duration = total_duration
         self.burn_notes = burn_notes
 
+    def _normalize_image_rotations(self) -> None:
+        """Apply EXIF rotation to each panel's image by saving a corrected copy.
+
+        FFmpeg ignores EXIF orientation, so phone photos come out rotated
+        in the exported video. We detect rotation via QImageReader and save
+        a pre-rotated PNG to temp for FFmpeg to use instead.
+        """
+        for panel in self.panels:
+            reader = QImageReader(panel.image_path)
+            transformation = reader.transformation()
+            if transformation == 0:  # no rotation needed
+                continue
+            reader.setAutoTransform(True)
+            image = reader.read()
+            if image.isNull():
+                continue
+            temp_path = os.path.join(
+                tempfile.gettempdir(),
+                f"animatic_rot_{os.path.basename(panel.image_path)}.png",
+            )
+            image.save(temp_path, "PNG")
+            panel.image_path = temp_path
+
     def run(self) -> None:
         """Execute the FFmpeg render and report progress."""
         import re
         import subprocess
 
         try:
+            # Pre-rotate any images with EXIF orientation so FFmpeg sees them
+            # the same way the Qt preview does
+            self._normalize_image_rotations()
+
             cmd = self.engine._build_multi_panel_cmd(
                 self.panels,
                 self.output_path,
