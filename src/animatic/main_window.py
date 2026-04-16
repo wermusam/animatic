@@ -355,9 +355,8 @@ class AnimaticCreator(QMainWindow):
         self.panel_audio_label.setObjectName("AudioLabel")
         controls.addWidget(self.panel_audio_label)
 
-        self.remove_audio_btn = QPushButton("\U0001f5d1")
+        self.remove_audio_btn = QPushButton("Remove Audio")
         self.remove_audio_btn.setObjectName("RemoveBtn")
-        self.remove_audio_btn.setFixedWidth(36)
         self.remove_audio_btn.setToolTip("Remove audio from this panel")
         self.remove_audio_btn.clicked.connect(self._remove_panel_audio)
         controls.addWidget(self.remove_audio_btn)
