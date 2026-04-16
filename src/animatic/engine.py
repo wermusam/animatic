@@ -227,9 +227,8 @@ class AnimaticEngine:
                 escaped = self._escape_drawtext(panels[i].notes)
                 vfilter += (
                     f",drawtext=text='{escaped}'"
-                    ":fontsize=48:fontcolor=white"
+                    ":fontsize=48:fontcolor=yellow"
                     ":borderw=3:bordercolor=black"
-                    ":box=1:boxcolor=black@0.75:boxborderw=24"
                     ":x=(w-text_w)/2:y=h-th-80"
                 )
             filter_parts.append(f"[{vid_idx}:v]{vfilter}[{vlabel}]")
