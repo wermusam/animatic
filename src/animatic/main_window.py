@@ -1369,7 +1369,6 @@ class AnimaticCreator(QMainWindow):
             if panel and panel.audio_path:
                 has_audio = True
         self.remove_audio_btn.setEnabled(has_audio)
-        self.remove_audio_btn.setVisible(has_audio)
 
     def _set_default_output_path(self) -> None:
         """Set a default output path if none is set."""
