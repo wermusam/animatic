@@ -1151,7 +1151,9 @@ class AnimaticCreator(QMainWindow):
         output_path = self.output_path_input.text().strip()
         if not output_path:
             output_path = self._generate_output_path()
-            self.output_path_input.setText(output_path)
+        if not output_path.lower().endswith(".mp4"):
+            output_path += ".mp4"
+        self.output_path_input.setText(output_path)
 
         if os.path.exists(output_path):
             reply = QMessageBox.question(
@@ -1312,7 +1314,13 @@ class AnimaticCreator(QMainWindow):
         """
         count = len(self.project.panels)
         total = self.project.total_duration()
-        idx = self.player.current_index() + 1 if count > 0 else 0
+        if count == 0:
+            idx = 0
+        elif playing or self._scrubbing:
+            idx = self.player.current_index() + 1
+        else:
+            strip_row = self.panel_strip.currentRow()
+            idx = (strip_row + 1) if strip_row >= 0 else self.player.current_index() + 1
 
         current_time = self._format_time(elapsed)
         total_time = self._format_time(total)
