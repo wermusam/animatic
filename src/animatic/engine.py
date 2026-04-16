@@ -219,20 +219,14 @@ class AnimaticEngine:
         )
         filter_parts: list[str] = []
         concat_inputs: list[str] = []
-        font_path = _get_subtitle_font_path()
 
         for i, vid_idx in enumerate(panel_video_inputs):
             vlabel = f"v{i}"
             vfilter = scale_filter
             if burn_notes and panels[i].notes:
                 escaped = self._escape_drawtext(panels[i].notes)
-                font_clause = ""
-                if font_path:
-                    # Escape ':' in Windows paths so FFmpeg doesn't treat it as a separator
-                    safe_font = font_path.replace("\\", "/").replace(":", "\\:")
-                    font_clause = f"fontfile={safe_font}:"
                 vfilter += (
-                    f",drawtext={font_clause}text='{escaped}'"
+                    f",drawtext=text='{escaped}'"
                     ":fontsize=48:fontcolor=white"
                     ":borderw=3:bordercolor=black"
                     ":box=1:boxcolor=black@0.75:boxborderw=24"
