@@ -5,6 +5,7 @@ and audio into MP4 video files.
 """
 
 import os
+import platform
 import subprocess
 import time
 from typing import Optional
@@ -12,6 +13,35 @@ from typing import Optional
 from imageio_ffmpeg import get_ffmpeg_exe
 
 from animatic.models import Panel
+
+
+def _get_subtitle_font_path() -> Optional[str]:
+    """Return a path to a clean system font for subtitle rendering, or None."""
+    system = platform.system()
+    if system == "Windows":
+        for candidate in (
+            "C:/Windows/Fonts/segoeui.ttf",
+            "C:/Windows/Fonts/arial.ttf",
+            "C:/Windows/Fonts/calibri.ttf",
+        ):
+            if os.path.exists(candidate):
+                return candidate
+    elif system == "Darwin":
+        for candidate in (
+            "/System/Library/Fonts/Helvetica.ttc",
+            "/Library/Fonts/Arial.ttf",
+            "/System/Library/Fonts/Supplemental/Arial.ttf",
+        ):
+            if os.path.exists(candidate):
+                return candidate
+    else:
+        for candidate in (
+            "/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf",
+            "/usr/share/fonts/truetype/liberation/LiberationSans-Bold.ttf",
+        ):
+            if os.path.exists(candidate):
+                return candidate
+    return None
 
 
 class AnimaticEngine:
@@ -189,17 +219,21 @@ class AnimaticEngine:
         )
         filter_parts: list[str] = []
         concat_inputs: list[str] = []
+        font_path = _get_subtitle_font_path()
 
         for i, vid_idx in enumerate(panel_video_inputs):
             vlabel = f"v{i}"
             vfilter = scale_filter
             if burn_notes and panels[i].notes:
                 escaped = self._escape_drawtext(panels[i].notes)
+                font_clause = ""
+                if font_path:
+                    font_clause = f"fontfile='{font_path}':"
                 vfilter += (
-                    f",drawtext=text='{escaped}'"
-                    ":fontsize=56:fontcolor=yellow"
-                    ":borderw=4:bordercolor=black"
-                    ":box=1:boxcolor=black@0.6:boxborderw=20"
+                    f",drawtext={font_clause}text='{escaped}'"
+                    ":fontsize=48:fontcolor=white"
+                    ":borderw=3:bordercolor=black"
+                    ":box=1:boxcolor=black@0.75:boxborderw=24"
                     ":x=(w-text_w)/2:y=h-th-80"
                 )
             filter_parts.append(f"[{vid_idx}:v]{vfilter}[{vlabel}]")
