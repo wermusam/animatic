@@ -1076,7 +1076,7 @@ class TestDrawtextEngine:
         """Special characters in notes should be escaped for FFmpeg."""
         from animatic.engine import AnimaticEngine
 
-        assert "\\\\:" in AnimaticEngine._escape_drawtext("Hello: world")
+        assert "\\:" in AnimaticEngine._escape_drawtext("Hello: world")
 
 
 class TestReRecord:

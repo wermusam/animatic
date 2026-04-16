@@ -290,9 +290,13 @@ class AnimaticEngine:
 
     @staticmethod
     def _escape_drawtext(text: str) -> str:
-        """Escape special characters for FFmpeg's drawtext filter."""
-        text = text.replace("\\", "\\\\\\\\")
-        text = text.replace("'", "'\\\\\\''")
-        text = text.replace(":", "\\\\:")
+        """Escape special characters for FFmpeg's drawtext filter.
+
+        We pass the command as a list to Popen (no shell), so we only
+        need FFmpeg's own drawtext escape rules, not shell escapes.
+        """
+        text = text.replace("\\", "\\\\")
+        text = text.replace("'", "\\'")
+        text = text.replace(":", "\\:")
         text = text.replace("%", "%%")
         return text
