@@ -236,10 +236,10 @@ class AnimaticEngine:
             if has_per_panel_audio:
                 alabel = f"a{i}"
                 if i in panel_audio_inputs:
-                    # Trim audio to panel duration
+                    # Trim audio to panel duration, then normalize loudness
                     aidx = panel_audio_inputs[i]
                     filter_parts.append(
-                        f"[{aidx}:a]atrim=0:{panel.duration},asetpts=PTS-STARTPTS[{alabel}]"
+                        f"[{aidx}:a]atrim=0:{panel.duration},asetpts=PTS-STARTPTS,dynaudnorm[{alabel}]"
                     )
                 else:
                     # Generate silence for panels without audio
