@@ -222,11 +222,11 @@ class PanelStrip(QListWidget):
 
     def __init__(self, parent: Optional[QWidget] = None) -> None:
         super().__init__(parent)
-        self.setViewMode(QListWidget.ViewMode.IconMode)
+        self.setViewMode(QListWidget.ViewMode.ListMode)
         self.setFlow(QListWidget.Flow.LeftToRight)
         self.setWrapping(False)
-        self.setMovement(QListWidget.Movement.Snap)
         self.setDragDropMode(QListWidget.DragDropMode.InternalMove)
+        self.setDefaultDropAction(Qt.DropAction.MoveAction)
         self.setIconSize(QSize(120, 80))
         self.setFixedHeight(120)
         self.setSpacing(8)
