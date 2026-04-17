@@ -672,6 +672,9 @@ class AnimaticCreator(QMainWindow):
                 new_panels.append(panel_map[pid])
         self._undo_stack.push(self.project)
         self.project.panels = new_panels
+        # Refresh main display + status to reflect the new ordering
+        self._on_panel_selected(self.panel_strip.currentItem(), None)
+        self._update_status()
 
     def _on_duration_changed(self, value: float) -> None:
         """Update the selected panel's duration when the spinbox changes."""
