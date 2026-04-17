@@ -2,15 +2,13 @@
 
 A free, offline storyboard animatic tool. Drag in images, add voice lines, preview, and export an MP4 to share with your team.
 
-Built for game preproduction: fast iteration, no subscriptions, no cloud. Works on Windows, Mac, and Linux.
+No subscriptions, no cloud, no account. Works on Windows, Mac, and Linux.
 
 ![Empty state](screenshots/storyboard_1.PNG)
 
 ## What's an animatic?
 
 An animatic is a moving storyboard. You take still drawings, set how long each one is on screen, add voice lines, and stitch them into a video. Directors use this to test pacing and dialogue before any real animation happens.
-
-This tool exists because the paid options (Boords, Toon Boom Storyboard Pro) cost money and live in the cloud. This one runs on your laptop, saves files locally, and is free.
 
 ## Install
 
