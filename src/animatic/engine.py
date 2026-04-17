@@ -225,8 +225,13 @@ class AnimaticEngine:
             vfilter = scale_filter
             if burn_notes and panels[i].notes:
                 escaped = self._escape_drawtext(panels[i].notes)
+                font_path = _get_subtitle_font_path()
+                font_arg = ""
+                if font_path:
+                    escaped_font = font_path.replace(":", r"\:")
+                    font_arg = f"fontfile={escaped_font}:"
                 vfilter += (
-                    f",drawtext=text='{escaped}'"
+                    f",drawtext={font_arg}text='{escaped}'"
                     ":fontsize=48:fontcolor=yellow"
                     ":borderw=3:bordercolor=black"
                     ":x=(w-text_w)/2:y=h-th-80"
