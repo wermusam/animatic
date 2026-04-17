@@ -1,6 +1,6 @@
 [project]
 name = "animatic"
-version = "0.1.0"
+version = "1.0.0"
 description = "A free, fast storyboard animatic tool. Drag images, add audio, preview instantly, export video."
 readme = "README.md"
 requires-python = ">=3.13"
