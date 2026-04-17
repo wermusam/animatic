@@ -705,6 +705,14 @@ class AnimaticCreator(QMainWindow):
         if self.panel_strip.count() == 0:
             self.main_display.clear()
             self.main_display.setText("Drop images here or click Add Images")
+            self.panel_audio_label.setText("Panel Audio: None")
+            self.notes_input.blockSignals(True)
+            self.notes_input.setText("")
+            self.notes_input.blockSignals(False)
+            self.duration_spin.blockSignals(True)
+            self.duration_spin.setValue(3.0)
+            self.duration_spin.blockSignals(False)
+            self.dialogue_label.setText("")
 
     def _find_panel(self, panel_id: str) -> Optional[Panel]:
         """Find a panel in the project by its ID.
