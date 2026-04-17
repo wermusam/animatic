@@ -225,6 +225,7 @@ class PanelStrip(QListWidget):
         self.setViewMode(QListWidget.ViewMode.IconMode)
         self.setFlow(QListWidget.Flow.LeftToRight)
         self.setWrapping(False)
+        self.setMovement(QListWidget.Movement.Snap)
         self.setDragDropMode(QListWidget.DragDropMode.InternalMove)
         self.setIconSize(QSize(120, 80))
         self.setFixedHeight(120)
