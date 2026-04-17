@@ -4,6 +4,8 @@ A free, offline storyboard animatic tool. Drag in images, add voice lines, previ
 
 Built for game preproduction: fast iteration, no subscriptions, no cloud. Works on Windows, Mac, and Linux.
 
+![Empty state](docs/screenshots/01-empty.png)
+
 ---
 
 ## What's an animatic?
@@ -45,13 +47,37 @@ That's it. `uv` will install Python 3.13, PySide6, and FFmpeg automatically.
 uv run python main.py
 ```
 
-The app window opens. You'll see:
-- A big title bar at the top
-- A row of buttons (Add Images, Add Audio, Record, Save Project, Load Project, Export Video)
-- A preview area in the middle
-- A panel strip at the bottom (empty until you add images)
-- A notes field on the right
-- Playback controls (Play/Pause/Stop, scrub bar, timecode)
+The app window opens. You'll see this empty state:
+
+![Empty state](docs/screenshots/01-empty.png)
+
+From top to bottom:
+- The title bar
+- The preview area (where the dotted box says "Drop images here or click Add Images")
+- The button row:
+
+  ![Button row](docs/screenshots/08-buttons-closeup.png)
+
+  - **Add Images** (green) — opens a file picker for images
+  - **Add Audio** (green) — opens a file picker for audio
+  - **Record** (red) — records from your microphone
+  - **Save Project** (pink) — saves a `.animatic` file
+  - **Load Project** (pink) — opens a `.animatic` file
+
+- The panel strip (empty until you add images)
+- The controls row:
+
+  ![Controls row](docs/screenshots/09-controls-closeup.png)
+
+  - **Duration** spinner — seconds for the selected panel
+  - **Duplicate** / **Remove Panel** — for the selected panel
+  - **Audio** label — shows the audio filename and duration if any is attached
+  - **Remove Audio** — clears audio from the selected panel
+  - **Total** — total length of the animatic and panel count
+  - **Notes** field — free text per panel
+  - **Play / Stop** + scrub bar + timecode — for previewing
+  - **Save location** + **Browse** — where the MP4 will be written
+  - **Burn notes into export** checkbox + **Export Video** button
 
 ---
 
@@ -71,6 +97,8 @@ Click the green **Add Images** button. A file picker opens. Select one or more i
 Drag a folder onto the window. The app pulls in every image inside it.
 
 Each image becomes a "panel" with a default duration of 3 seconds.
+
+![Panels added](docs/screenshots/02-panels-added.png)
 
 ### 2. Reorder panels
 
@@ -95,6 +123,12 @@ Three ways:
 
 If you don't like the take, just click Record again — the new recording replaces the old one. No need to delete first.
 
+![Recording in progress](docs/screenshots/03-recording.png)
+
+After you click Stop Recording, the panel duration auto-updates to match the recording length:
+
+![Panel with audio attached](docs/screenshots/04-with-audio.png)
+
 **Option B — drag an audio file:**
 Drag a .mp3, .wav, or .m4a file onto a panel in the strip (or onto the main window after selecting a panel). It attaches to that panel.
 
@@ -110,7 +144,9 @@ Click a panel to select it. Type into the **Notes** field on the right. Notes ar
 - Direction for the team ("close-up on her hand")
 - Anything else you want the voice actor or animator to know
 
-Notes are saved with the project and can be optionally burned into the exported video.
+Notes are saved with the project and can be optionally burned into the exported video. While typing, you'll see them appear as yellow text near the bottom of the preview:
+
+![Notes shown as yellow text in preview](docs/screenshots/05-burn-notes-preview.png)
 
 ### 6. Preview
 
@@ -129,6 +165,10 @@ You can:
 3. If "Burn notes into export" is checked, your notes will appear as yellow subtitles at the bottom of the video
 4. A progress bar shows how far along the export is
 5. When it's done, the app asks if you want to open the video. Click Yes to play it in your system's video player
+
+![Export progress](docs/screenshots/06-exporting.png)
+
+![Export complete dialog](docs/screenshots/07-export-complete.png)
 
 The exported MP4 plays anywhere — Discord, Quicktime, VLC, web browsers, phones.
 
