@@ -4,7 +4,7 @@ A free, offline storyboard animatic tool. Drag in images, add voice lines, previ
 
 Built for game preproduction: fast iteration, no subscriptions, no cloud. Works on Windows, Mac, and Linux.
 
-![Empty state](docs/screenshots/01-empty.png)
+![Empty state](screenshots/storyboard_1.PNG)
 
 ---
 
@@ -49,14 +49,14 @@ uv run python main.py
 
 The app window opens. You'll see this empty state:
 
-![Empty state](docs/screenshots/01-empty.png)
+![Empty state](screenshots/storyboard_1.PNG)
 
 From top to bottom:
 - The title bar
 - The preview area (where the dotted box says "Drop images here or click Add Images")
 - The button row:
 
-  ![Button row](docs/screenshots/08-buttons-closeup.png)
+  ![Button row](screenshots/Storyboard_6.PNG)
 
   - **Add Images** (green) — opens a file picker for images
   - **Add Audio** (green) — opens a file picker for audio
@@ -67,7 +67,7 @@ From top to bottom:
 - The panel strip (empty until you add images)
 - The controls row:
 
-  ![Controls row](docs/screenshots/09-controls-closeup.png)
+  ![Controls row](screenshots/Storyboard_7.PNG)
 
   - **Duration** spinner — seconds for the selected panel
   - **Duplicate** / **Remove Panel** — for the selected panel
@@ -98,7 +98,7 @@ Drag a folder onto the window. The app pulls in every image inside it.
 
 Each image becomes a "panel" with a default duration of 3 seconds.
 
-![Panels added](docs/screenshots/02-panels-added.png)
+![Panels added](screenshots/Storyboard_2.PNG)
 
 ### 2. Reorder panels
 
@@ -123,11 +123,11 @@ Three ways:
 
 If you don't like the take, just click Record again — the new recording replaces the old one. No need to delete first.
 
-![Recording in progress](docs/screenshots/03-recording.png)
+![Recording in progress](screenshots/Storyboard_3.PNG)
 
 After you click Stop Recording, the panel duration auto-updates to match the recording length:
 
-![Panel with audio attached](docs/screenshots/04-with-audio.png)
+![Panel with audio attached](screenshots/Storyboard_4.PNG)
 
 **Option B — drag an audio file:**
 Drag a .mp3, .wav, or .m4a file onto a panel in the strip (or onto the main window after selecting a panel). It attaches to that panel.
@@ -146,7 +146,7 @@ Click a panel to select it. Type into the **Notes** field on the right. Notes ar
 
 Notes are saved with the project and can be optionally burned into the exported video. While typing, you'll see them appear as yellow text near the bottom of the preview:
 
-![Notes shown as yellow text in preview](docs/screenshots/05-burn-notes-preview.png)
+![Notes shown as yellow text in preview](screenshots/Storyboard_5.PNG)
 
 ### 6. Preview
 
@@ -166,9 +166,9 @@ You can:
 4. A progress bar shows how far along the export is
 5. When it's done, the app asks if you want to open the video. Click Yes to play it in your system's video player
 
-![Export progress](docs/screenshots/06-exporting.png)
+![Export progress](screenshots/Storyboard_8.PNG)
 
-![Export complete dialog](docs/screenshots/07-export-complete.png)
+![Export complete dialog](screenshots/Storyboard_9.PNG)
 
 The exported MP4 plays anywhere — Discord, Quicktime, VLC, web browsers, phones.
 
