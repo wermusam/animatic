@@ -6,44 +6,32 @@ No subscriptions, no cloud, no account. Works on Windows, Mac, and Linux.
 
 ![Empty state](screenshots/storyboard_1.PNG)
 
+## Download
+
+Click the link for your computer to download:
+
+* **[Download for Windows](https://github.com/wermusam/animatic/releases/latest/download/StoryboardAnimatic-Windows.exe)**
+* **[Download for Mac](https://github.com/wermusam/animatic/releases/latest/download/StoryboardAnimatic-Mac)**
+* **[Download for Linux](https://github.com/wermusam/animatic/releases/latest/download/StoryboardAnimatic-Linux)**
+
+No installation. Download and run.
+
+**Mac users:** On first run, Mac may block the file because it's not signed. Right click the file, then Open, then Open anyway.
+
+**Windows users:** Windows SmartScreen may warn that the publisher is unknown. Click "More info," then "Run anyway."
+
 ## What's an animatic?
 
 An animatic is a moving storyboard. You take still drawings, set how long each one is on screen, add voice lines, and stitch them into a video. Directors use this to test pacing and dialogue before any real animation happens.
 
-## Install
+## The window
 
-You need [uv](https://docs.astral.sh/uv/) (a Python package manager). One-liner install:
-
-**Mac/Linux:**
-```
-curl -LsSf https://astral.sh/uv/install.sh | sh
-```
-
-**Windows (PowerShell):**
-```
-powershell -ExecutionPolicy ByPass -c "irm https://astral.sh/uv/install.ps1 | iex"
-```
-
-Then clone the repo and install dependencies:
-```
-git clone <repo-url>
-cd animatic
-uv sync
-```
-
-That's it. `uv` will install Python 3.13, PySide6, and FFmpeg automatically.
-
-## Run
-
-```
-uv run python main.py
-```
-
-The app window opens. You'll see this empty state:
+When you open the app, you'll see this:
 
 ![Empty state](screenshots/storyboard_1.PNG)
 
 From top to bottom:
+
 * The title bar
 * The preview area (where the dotted box says "Drop images here or click Add Images")
 * The button row:
@@ -98,7 +86,7 @@ Click and hold any panel in the strip at the bottom, then drag it left or right.
 
 Click a panel to select it. In the controls row you'll see a **Duration** field (in seconds). Type the number you want (e.g. `1.5` for one and a half seconds) or use the up/down arrows. Press Tab or click somewhere else to commit the change.
 
-If you've added audio to a panel, the duration auto-adjusts to match the audio length, so you don't need to set it manually.
+If you've added audio to a panel, the duration automatically adjusts to match the audio length, so you don't need to set it manually.
 
 ### 4. Add voice lines (audio)
 
@@ -115,7 +103,7 @@ If you don't like the take, just click Record again. The new recording replaces 
 
 ![Recording in progress](screenshots/Storyboard_3.PNG)
 
-After you click Stop Recording, the panel duration auto-updates to match the recording length:
+After you click Stop Recording, the panel duration updates to match the recording length:
 
 ![Panel with audio attached](screenshots/Storyboard_4.PNG)
 
@@ -131,7 +119,7 @@ To remove audio from a panel: select the panel, click the **Remove Audio** butto
 
 Click a panel to select it. Type into the **Notes** field. Notes are for things like:
 * What the character is saying ("LINA: I'm not going back.")
-* Direction for the team ("close-up on her hand")
+* Direction for the team ("closeup on her hand")
 * Anything else you want the voice actor or animator to know
 
 Notes are saved with the project and can be optionally burned into the exported video. While typing, you'll see them appear as yellow text near the bottom of the preview:
@@ -189,10 +177,10 @@ While typing in the Notes field or Duration field, these shortcuts are disabled 
 ## Tips
 
 * **Phone photos look rotated wrong?** The app handles EXIF rotation automatically. What you see in preview is what you get in the export.
-* **Audio quiet in the export?** The app normalizes per-panel audio with FFmpeg's `dynaudnorm`, so quiet recordings get boosted. If it's still quiet, your mic input level was very low; re-record closer to the mic.
+* **Audio quiet in the export?** The app normalizes each panel's audio so quiet recordings get boosted. If it's still quiet, your mic input level was very low; record again closer to the mic.
 * **Want a clean export with no text?** Uncheck "Burn notes into export" before clicking Export Video.
-* **Crashed mid-export?** Your project file is safe (it was already saved before you hit export). Just reopen and try again.
-* **Want to test pacing without exporting?** The preview is real-time and accurate. Use it to nail timing, then export once you're happy.
+* **Crashed during export?** Your project file is safe (it was already saved before you hit export). Just reopen and try again.
+* **Want to test pacing without exporting?** The preview is accurate. Use it to nail timing, then export once you're happy.
 
 ## Troubleshooting
 
@@ -200,15 +188,39 @@ While typing in the Notes field or Duration field, these shortcuts are disabled 
 Only .png, .jpg, .jpeg, and .gif work. Convert other formats first.
 
 **"Record button does nothing"**
-Your OS needs to grant microphone permission to the app. On Mac, check System Settings → Privacy & Security → Microphone. On Windows, check Settings → Privacy → Microphone.
+Your OS needs to grant microphone permission to the app. On Mac, check System Settings, Privacy & Security, Microphone. On Windows, check Settings, Privacy, Microphone.
 
 **"Export takes forever"**
-First export of a session is slower because images get pre-processed. Subsequent exports of the same project are faster (the pre-processed images are cached). Big images (>4K) will be slower than small ones (1920×1080 is the target resolution).
+First export of a session is slower because images get processed for rotation. After that, the processed images are cached and repeat exports are fast. Big images (>4K) will be slower than small ones (1920x1080 is the target resolution).
 
 **"The MP4 won't play on my friend's machine"**
 The export uses H.264 video and AAC audio, which play everywhere. If it really doesn't play, check the file actually finished exporting (the progress bar should hit 100%).
 
-## Building from source / for developers
+## For developers
+
+### Run from source
+
+You need [uv](https://docs.astral.sh/uv/) (a Python package manager):
+
+**Mac/Linux:**
+```
+curl -LsSf https://astral.sh/uv/install.sh | sh
+```
+
+**Windows (PowerShell):**
+```
+powershell -ExecutionPolicy ByPass -c "irm https://astral.sh/uv/install.ps1 | iex"
+```
+
+Clone and run:
+```
+git clone https://github.com/wermusam/animatic.git
+cd animatic
+uv sync
+uv run python main.py
+```
+
+`uv` installs Python 3.13, PySide6, and FFmpeg automatically.
 
 ### Run tests
 
