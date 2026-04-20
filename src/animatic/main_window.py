@@ -13,7 +13,7 @@ import tempfile
 from datetime import datetime
 from typing import Optional
 
-from PySide6.QtCore import QEvent, QObject, QSize, Qt, QThread, QTimer, Signal
+from PySide6.QtCore import QEvent, QObject, QRect, QSize, Qt, QThread, QTimer, Signal
 from PySide6.QtGui import (
     QColor,
     QDragEnterEvent,
@@ -161,10 +161,24 @@ class ExportThread(QThread):
             font.setBold(True)
             painter.setFont(font)
 
-            fm = painter.fontMetrics()
-            text_rect = fm.boundingRect(panel.notes)
-            x = (image.width() - text_rect.width()) // 2
-            y = image.height() - max(40, int(image.height() / 20))
+            # Word-wrap the notes into a rect that fits within image width minus margin,
+            # bottom-aligned. Matches the preview's QLabel.setWordWrap(True) behavior.
+            margin = max(20, int(image.width() * 0.05))
+            available_width = image.width() - 2 * margin
+            text_flags = (
+                Qt.AlignmentFlag.AlignHCenter
+                | Qt.AlignmentFlag.AlignBottom
+                | Qt.TextFlag.TextWordWrap
+            )
+            measure_rect = QRect(0, 0, available_width, image.height())
+            wrapped = painter.boundingRect(measure_rect, text_flags, panel.notes)
+            bottom_margin = max(40, int(image.height() / 20))
+            text_rect = QRect(
+                margin,
+                image.height() - bottom_margin - wrapped.height(),
+                available_width,
+                wrapped.height(),
+            )
 
             # Outline: draw text in black at 8 offset positions, then yellow on top
             outline = max(2, pt // 12)
@@ -173,9 +187,9 @@ class ExportThread(QThread):
                 for dy in (-outline, 0, outline):
                     if dx == 0 and dy == 0:
                         continue
-                    painter.drawText(x + dx, y + dy, panel.notes)
+                    painter.drawText(text_rect.translated(dx, dy), text_flags, panel.notes)
             painter.setPen(QColor("yellow"))
-            painter.drawText(x, y, panel.notes)
+            painter.drawText(text_rect, text_flags, panel.notes)
             painter.end()
 
             image.save(temp_path, "PNG")
