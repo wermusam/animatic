@@ -6,6 +6,10 @@ No subscriptions, no cloud, no account. Works on Windows, Mac, and Linux.
 
 ![Empty state](screenshots/storyboard_1.PNG)
 
+## Video tutorial
+
+https://github.com/wermusam/animatic/raw/main/screenshots/animatic_tutorial.mp4
+
 ## Download
 
 Click the link for your computer to download:
