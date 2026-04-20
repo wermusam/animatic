@@ -118,15 +118,14 @@ class ExportThread(QThread):
             panel.image_path = temp_path
 
     def _bake_notes_into_images(self) -> None:
-        """Render each panel (drawing + yellow caption) directly to 1920x1080.
+        """Render every panel to 1920x1080 with a consistent caption strip.
 
-        Baking at final video resolution gives consistent, readable text size
-        regardless of source image resolution or note length, since FFmpeg's
-        scale/pad filter becomes a no-op on already-1920x1080 frames. The
-        drawing is scaled to fit the area above the caption strip; the strip
-        holds word-wrapped yellow notes at a fixed font size.
+        If any panel has notes, ALL panels are baked with the same strip
+        height (sized to fit the longest note). Panels without notes get
+        a blank strip. This keeps the drawing area the same size across
+        the whole sequence, matching pro storyboard layout conventions.
 
-        Only runs when burn_notes is True and the panel has non-empty notes.
+        Only runs when burn_notes is True and at least one panel has notes.
         """
         if not self.burn_notes:
             return
@@ -136,16 +135,45 @@ class ExportThread(QThread):
         MARGIN_X = 60
         STRIP_PADDING = 20
 
+        font = QFont()
+        font.setPointSize(FONT_PT)
+        font.setBold(True)
+        available_width = VIDEO_W - 2 * MARGIN_X
+        text_flags = (
+            Qt.AlignmentFlag.AlignHCenter
+            | Qt.AlignmentFlag.AlignTop
+            | Qt.TextFlag.TextWordWrap
+        )
+
+        # Pass 1: measure the tallest wrapped caption across all panels
+        measure_canvas = QImage(1, 1, QImage.Format.Format_RGB32)
+        measure_painter = QPainter(measure_canvas)
+        measure_painter.setFont(font)
+        max_text_height = 0
         for panel in self.panels:
             if not panel.notes:
                 continue
+            wrapped = measure_painter.boundingRect(
+                QRect(0, 0, available_width, VIDEO_H),
+                text_flags,
+                panel.notes,
+            )
+            max_text_height = max(max_text_height, wrapped.height())
+        measure_painter.end()
 
-            # Cache key includes source mtime so editing the source image invalidates the cache
+        if max_text_height == 0:
+            return
+
+        strip_height = min(max_text_height + STRIP_PADDING * 2, VIDEO_H // 3)
+        drawing_area_h = VIDEO_H - strip_height
+
+        # Pass 2: bake every panel with the uniform strip height
+        for panel in self.panels:
             try:
                 src_mtime = os.path.getmtime(panel.image_path)
             except OSError:
                 src_mtime = 0.0
-            cache_key = f"{panel.notes}|{src_mtime}"
+            cache_key = f"{panel.notes}|{src_mtime}|{strip_height}"
             notes_hash = hashlib.md5(cache_key.encode("utf-8")).hexdigest()[:8]
             base = os.path.splitext(os.path.basename(panel.image_path))[0]
             temp_path = os.path.join(
@@ -163,30 +191,6 @@ class ExportThread(QThread):
             canvas = QImage(VIDEO_W, VIDEO_H, QImage.Format.Format_RGB32)
             canvas.fill(QColor("black"))
 
-            font = QFont()
-            font.setPointSize(FONT_PT)
-            font.setBold(True)
-
-            available_width = VIDEO_W - 2 * MARGIN_X
-            text_flags = (
-                Qt.AlignmentFlag.AlignHCenter
-                | Qt.AlignmentFlag.AlignTop
-                | Qt.TextFlag.TextWordWrap
-            )
-            measure_painter = QPainter(canvas)
-            measure_painter.setFont(font)
-            wrapped = measure_painter.boundingRect(
-                QRect(0, 0, available_width, VIDEO_H),
-                text_flags,
-                panel.notes,
-            )
-            measure_painter.end()
-
-            # Cap the strip at 1/3 of canvas so drawing keeps most of the frame
-            strip_height = min(wrapped.height() + STRIP_PADDING * 2, VIDEO_H // 3)
-            drawing_area_h = VIDEO_H - strip_height
-
-            # Scale drawing to fit above the strip, keeping aspect ratio
             scale = min(VIDEO_W / src_image.width(), drawing_area_h / src_image.height())
             scaled_w = int(src_image.width() * scale)
             scaled_h = int(src_image.height() * scale)
@@ -202,18 +206,19 @@ class ExportThread(QThread):
             painter = QPainter(canvas)
             painter.setRenderHint(QPainter.RenderHint.TextAntialiasing, True)
             painter.drawImage(draw_x, draw_y, scaled_img)
-            painter.setFont(font)
-            painter.setPen(QColor("yellow"))
-            painter.drawText(
-                QRect(
-                    MARGIN_X,
-                    drawing_area_h + STRIP_PADDING,
-                    available_width,
-                    strip_height - 2 * STRIP_PADDING,
-                ),
-                text_flags,
-                panel.notes,
-            )
+            if panel.notes:
+                painter.setFont(font)
+                painter.setPen(QColor("yellow"))
+                painter.drawText(
+                    QRect(
+                        MARGIN_X,
+                        drawing_area_h + STRIP_PADDING,
+                        available_width,
+                        strip_height - 2 * STRIP_PADDING,
+                    ),
+                    text_flags,
+                    panel.notes,
+                )
             painter.end()
 
             canvas.save(temp_path, "PNG")
