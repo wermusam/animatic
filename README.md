@@ -8,7 +8,7 @@ No subscriptions, no cloud, no account. Works on Windows, Mac, and Linux.
 
 ## Video tutorial
 
-https://github.com/wermusam/animatic/raw/main/screenshots/animatic_tutorial.mp4
+<video src="screenshots/animatic_tutorial.mp4" controls width="100%"></video>
 
 ## Download
 
