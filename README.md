@@ -8,7 +8,7 @@ No subscriptions, no cloud, no account. Works on Windows, Mac, and Linux.
 
 ## Video tutorial
 
-<video src="screenshots/animatic_tutorial.mp4" controls width="100%"></video>
+https://github.com/user-attachments/assets/309d7c3b-86cc-4dc7-ac87-e0fc7e94177a
 
 ## Download
 
