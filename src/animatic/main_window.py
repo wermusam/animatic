@@ -4,7 +4,9 @@ Provides a multi-panel storyboard GUI with drag-and-drop,
 instant preview with timecode overlay, and FFmpeg export.
 """
 
+import collections
 import copy
+import hashlib
 import os
 import sys
 import tempfile
@@ -13,9 +15,13 @@ from typing import Optional
 
 from PySide6.QtCore import QEvent, QObject, QSize, Qt, QThread, QTimer, Signal
 from PySide6.QtGui import (
+    QColor,
     QDragEnterEvent,
     QDropEvent,
+    QFont,
+    QImage,
     QImageReader,
+    QPainter,
     QPixmap,
 )
 from PySide6.QtWidgets import (
@@ -111,6 +117,59 @@ class ExportThread(QThread):
             image.save(temp_path, "JPG", 90)
             panel.image_path = temp_path
 
+    def _bake_notes_into_images(self) -> None:
+        """Paint panel notes onto images with QPainter before FFmpeg sees them.
+
+        Yellow text with a black outline, centered near the bottom, matching
+        the preview style. Replaces FFmpeg's drawtext filter so the export
+        does not depend on platform-specific font paths or filter syntax.
+
+        Only runs when burn_notes is True and the panel has non-empty notes.
+        """
+        if not self.burn_notes:
+            return
+        for panel in self.panels:
+            if not panel.notes:
+                continue
+            image = QImage(panel.image_path)
+            if image.isNull():
+                continue
+
+            painter = QPainter(image)
+            painter.setRenderHint(QPainter.RenderHint.TextAntialiasing, True)
+            # Font size scales with image height so text is readable at any resolution
+            pt = max(24, int(image.height() / 28))
+            font = QFont()
+            font.setPointSize(pt)
+            font.setBold(True)
+            painter.setFont(font)
+
+            fm = painter.fontMetrics()
+            text_rect = fm.boundingRect(panel.notes)
+            x = (image.width() - text_rect.width()) // 2
+            y = image.height() - max(40, int(image.height() / 20))
+
+            # Outline: draw text in black at 8 offset positions, then yellow on top
+            outline = max(2, pt // 12)
+            painter.setPen(QColor("black"))
+            for dx in (-outline, 0, outline):
+                for dy in (-outline, 0, outline):
+                    if dx == 0 and dy == 0:
+                        continue
+                    painter.drawText(x + dx, y + dy, panel.notes)
+            painter.setPen(QColor("yellow"))
+            painter.drawText(x, y, panel.notes)
+            painter.end()
+
+            notes_hash = hashlib.md5(panel.notes.encode("utf-8")).hexdigest()[:8]
+            base = os.path.splitext(os.path.basename(panel.image_path))[0]
+            temp_path = os.path.join(
+                tempfile.gettempdir(),
+                f"animatic_baked_{base}_{notes_hash}.png",
+            )
+            image.save(temp_path, "PNG")
+            panel.image_path = temp_path
+
     def run(self) -> None:
         """Execute the FFmpeg render and report progress."""
         import re
@@ -120,12 +179,13 @@ class ExportThread(QThread):
             # Pre-rotate any images with EXIF orientation so FFmpeg sees them
             # the same way the Qt preview does
             self._normalize_image_rotations()
+            # Paint notes onto images with Qt so FFmpeg does not need drawtext
+            self._bake_notes_into_images()
 
             cmd = self.engine._build_multi_panel_cmd(
                 self.panels,
                 self.output_path,
                 self.audio_path,
-                burn_notes=self.burn_notes,
             )
 
             startupinfo = None
@@ -142,8 +202,10 @@ class ExportThread(QThread):
             )
 
             time_pattern = re.compile(r"time=(\d+):(\d+):(\d+\.\d+)")
+            stderr_tail: collections.deque = collections.deque(maxlen=50)
             try:
                 for line in proc.stderr:
+                    stderr_tail.append(line)
                     match = time_pattern.search(line)
                     if match and self.total_duration > 0:
                         h = float(match.group(1))
@@ -158,7 +220,11 @@ class ExportThread(QThread):
             finally:
                 proc.wait()
             if proc.returncode != 0:
-                raise subprocess.CalledProcessError(proc.returncode, cmd)
+                err_tail = "".join(stderr_tail).strip()
+                raise RuntimeError(
+                    f"FFmpeg failed (exit code {proc.returncode}).\n\n"
+                    f"Last error output:\n{err_tail}"
+                )
 
             self.progress.emit(100)
             self.succeeded.emit(self.output_path)

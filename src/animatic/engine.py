@@ -5,7 +5,6 @@ and audio into MP4 video files.
 """
 
 import os
-import platform
 import subprocess
 import time
 from typing import Optional
@@ -13,35 +12,6 @@ from typing import Optional
 from imageio_ffmpeg import get_ffmpeg_exe
 
 from animatic.models import Panel
-
-
-def _get_subtitle_font_path() -> Optional[str]:
-    """Return a path to a clean system font for subtitle rendering, or None."""
-    system = platform.system()
-    if system == "Windows":
-        for candidate in (
-            "C:/Windows/Fonts/segoeui.ttf",
-            "C:/Windows/Fonts/arial.ttf",
-            "C:/Windows/Fonts/calibri.ttf",
-        ):
-            if os.path.exists(candidate):
-                return candidate
-    elif system == "Darwin":
-        for candidate in (
-            "/System/Library/Fonts/Helvetica.ttc",
-            "/Library/Fonts/Arial.ttf",
-            "/System/Library/Fonts/Supplemental/Arial.ttf",
-        ):
-            if os.path.exists(candidate):
-                return candidate
-    else:
-        for candidate in (
-            "/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf",
-            "/usr/share/fonts/truetype/liberation/LiberationSans-Bold.ttf",
-        ):
-            if os.path.exists(candidate):
-                return candidate
-    return None
 
 
 class AnimaticEngine:
@@ -167,7 +137,6 @@ class AnimaticEngine:
         panels: list[Panel],
         output_path: str,
         audio_path: Optional[str],
-        burn_notes: bool = False,
     ) -> list[str]:
         """Build the FFmpeg command for multi-panel concat.
 
@@ -175,6 +144,9 @@ class AnimaticEngine:
         - Per-panel audio: each panel has its own audio_path, concatenated
         - Global audio: one audio track laid over the whole video
         - No audio: video only
+
+        Notes are baked onto images by the caller (ExportThread) before
+        this runs, so there is no text overlay logic here.
 
         Args:
             panels: Ordered list of Panel objects.
@@ -222,21 +194,7 @@ class AnimaticEngine:
 
         for i, vid_idx in enumerate(panel_video_inputs):
             vlabel = f"v{i}"
-            vfilter = scale_filter
-            if burn_notes and panels[i].notes:
-                escaped = self._escape_drawtext(panels[i].notes)
-                font_path = _get_subtitle_font_path()
-                font_arg = ""
-                if font_path:
-                    escaped_font = font_path.replace(":", r"\:")
-                    font_arg = f"fontfile={escaped_font}:"
-                vfilter += (
-                    f",drawtext={font_arg}text='{escaped}'"
-                    ":fontsize=48:fontcolor=yellow"
-                    ":borderw=3:bordercolor=black"
-                    ":x=(w-text_w)/2:y=h-th-80"
-                )
-            filter_parts.append(f"[{vid_idx}:v]{vfilter}[{vlabel}]")
+            filter_parts.append(f"[{vid_idx}:v]{scale_filter}[{vlabel}]")
 
             if has_per_panel_audio:
                 alabel = f"a{i}"
@@ -285,16 +243,3 @@ class AnimaticEngine:
             ]
         )
         return cmd
-
-    @staticmethod
-    def _escape_drawtext(text: str) -> str:
-        """Escape special characters for FFmpeg's drawtext filter.
-
-        We pass the command as a list to Popen (no shell), so we only
-        need FFmpeg's own drawtext escape rules, not shell escapes.
-        """
-        text = text.replace("\\", "\\\\")
-        text = text.replace("'", "\\'")
-        text = text.replace(":", "\\:")
-        text = text.replace("%", "%%")
-        return text

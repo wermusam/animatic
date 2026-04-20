@@ -259,11 +259,15 @@ class TestPanelControls:
 class TestExport:
     """Tests for the export workflow."""
 
-    @patch("animatic.main_window.QMessageBox.information")
+    @patch("animatic.main_window.QMessageBox.question")
     def test_export_calls_engine(
         self, mock_popup, window: AnimaticCreator, temp_images: list[str]
     ) -> None:
         """Export should invoke FFmpeg via background thread."""
+        from PySide6.QtWidgets import QMessageBox
+
+        mock_popup.return_value = QMessageBox.StandardButton.No
+
         event, _mime = _make_drop_event(temp_images[:2])
         window.dropEvent(event)
         window.output_path_input.setText("C:/fake/output.mp4")
@@ -1033,50 +1037,98 @@ class TestDialogueNotesFeature:
         assert "Record" in window.record_btn.text()
 
 
-class TestDrawtextEngine:
-    """Tests for the FFmpeg drawtext subtitle burning."""
+class TestNotesBakeIn:
+    """Tests for painting notes onto images with QPainter before export."""
 
-    def test_drawtext_included_when_burn_on(self) -> None:
-        """FFmpeg command should include drawtext when burn_notes=True."""
+    def test_engine_never_emits_drawtext(self) -> None:
+        """Engine command must not use FFmpeg's drawtext filter anymore."""
         from animatic.engine import AnimaticEngine
         from animatic.models import Panel
 
         engine = AnimaticEngine()
         p = Panel("/tmp/test.png", duration=2.0)
-        p.notes = "Hello"
-        cmd = engine._build_multi_panel_cmd([p], "/tmp/out.mp4", None, burn_notes=True)
-        cmd_str = " ".join(cmd)
-        assert "drawtext" in cmd_str
-
-    def test_no_drawtext_when_burn_off(self) -> None:
-        """FFmpeg command should NOT include drawtext when burn_notes=False."""
-        from animatic.engine import AnimaticEngine
-        from animatic.models import Panel
-
-        engine = AnimaticEngine()
-        p = Panel("/tmp/test.png", duration=2.0)
-        p.notes = "Hello"
-        cmd = engine._build_multi_panel_cmd([p], "/tmp/out.mp4", None, burn_notes=False)
+        p.notes = "Hello: world"
+        cmd = engine._build_multi_panel_cmd([p], "/tmp/out.mp4", None)
         cmd_str = " ".join(cmd)
         assert "drawtext" not in cmd_str
 
-    def test_no_drawtext_when_notes_empty(self) -> None:
-        """FFmpeg command should skip drawtext for panels with empty notes."""
+    def test_bake_writes_png_and_updates_image_path(self, app, tmp_path) -> None:
+        """_bake_notes_into_images should write a PNG and redirect Panel.image_path."""
         from animatic.engine import AnimaticEngine
+        from animatic.main_window import ExportThread
         from animatic.models import Panel
 
-        engine = AnimaticEngine()
-        p = Panel("/tmp/test.png", duration=2.0)
+        # Real image file Qt can load
+        img = QImage(400, 300, QImage.Format.Format_RGB32)
+        img.fill(Qt.GlobalColor.blue)
+        src = str(tmp_path / "input.png")
+        img.save(src)
+
+        p = Panel(src, duration=2.0)
+        p.notes = "Hello world"
+        thread = ExportThread(
+            engine=AnimaticEngine(),
+            panels=[p],
+            output_path=str(tmp_path / "out.mp4"),
+            audio_path=None,
+            total_duration=2.0,
+            burn_notes=True,
+        )
+        thread._bake_notes_into_images()
+
+        assert p.image_path != src, "image_path should point at the baked PNG"
+        assert os.path.exists(p.image_path), "baked PNG should exist on disk"
+        assert p.image_path.endswith(".png")
+
+    def test_bake_skipped_when_burn_off(self, app, tmp_path) -> None:
+        """With burn_notes=False, _bake_notes_into_images must leave paths alone."""
+        from animatic.engine import AnimaticEngine
+        from animatic.main_window import ExportThread
+        from animatic.models import Panel
+
+        img = QImage(100, 100, QImage.Format.Format_RGB32)
+        img.fill(Qt.GlobalColor.red)
+        src = str(tmp_path / "a.png")
+        img.save(src)
+
+        p = Panel(src, duration=1.0)
+        p.notes = "some notes"
+        thread = ExportThread(
+            engine=AnimaticEngine(),
+            panels=[p],
+            output_path=str(tmp_path / "out.mp4"),
+            audio_path=None,
+            total_duration=1.0,
+            burn_notes=False,
+        )
+        thread._bake_notes_into_images()
+
+        assert p.image_path == src
+
+    def test_bake_skipped_when_notes_empty(self, app, tmp_path) -> None:
+        """Empty notes should skip baking even with burn_notes=True."""
+        from animatic.engine import AnimaticEngine
+        from animatic.main_window import ExportThread
+        from animatic.models import Panel
+
+        img = QImage(100, 100, QImage.Format.Format_RGB32)
+        img.fill(Qt.GlobalColor.green)
+        src = str(tmp_path / "b.png")
+        img.save(src)
+
+        p = Panel(src, duration=1.0)
         p.notes = ""
-        cmd = engine._build_multi_panel_cmd([p], "/tmp/out.mp4", None, burn_notes=True)
-        cmd_str = " ".join(cmd)
-        assert "drawtext" not in cmd_str
+        thread = ExportThread(
+            engine=AnimaticEngine(),
+            panels=[p],
+            output_path=str(tmp_path / "out.mp4"),
+            audio_path=None,
+            total_duration=1.0,
+            burn_notes=True,
+        )
+        thread._bake_notes_into_images()
 
-    def test_escape_special_characters(self) -> None:
-        """Special characters in notes should be escaped for FFmpeg."""
-        from animatic.engine import AnimaticEngine
-
-        assert "\\:" in AnimaticEngine._escape_drawtext("Hello: world")
+        assert p.image_path == src
 
 
 class TestReRecord:
