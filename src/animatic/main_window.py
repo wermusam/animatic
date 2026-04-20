@@ -131,6 +131,23 @@ class ExportThread(QThread):
         for panel in self.panels:
             if not panel.notes:
                 continue
+
+            # Cache key includes source mtime so editing the source image invalidates the cache
+            try:
+                src_mtime = os.path.getmtime(panel.image_path)
+            except OSError:
+                src_mtime = 0.0
+            cache_key = f"{panel.notes}|{src_mtime}"
+            notes_hash = hashlib.md5(cache_key.encode("utf-8")).hexdigest()[:8]
+            base = os.path.splitext(os.path.basename(panel.image_path))[0]
+            temp_path = os.path.join(
+                tempfile.gettempdir(),
+                f"animatic_baked_{base}_{notes_hash}.png",
+            )
+            if os.path.exists(temp_path):
+                panel.image_path = temp_path
+                continue
+
             image = QImage(panel.image_path)
             if image.isNull():
                 continue
@@ -161,12 +178,6 @@ class ExportThread(QThread):
             painter.drawText(x, y, panel.notes)
             painter.end()
 
-            notes_hash = hashlib.md5(panel.notes.encode("utf-8")).hexdigest()[:8]
-            base = os.path.splitext(os.path.basename(panel.image_path))[0]
-            temp_path = os.path.join(
-                tempfile.gettempdir(),
-                f"animatic_baked_{base}_{notes_hash}.png",
-            )
             image.save(temp_path, "PNG")
             panel.image_path = temp_path
 
