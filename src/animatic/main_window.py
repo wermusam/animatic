@@ -10,7 +10,6 @@ import hashlib
 import os
 import sys
 import tempfile
-from datetime import datetime
 from typing import Optional
 
 from PySide6.QtCore import QEvent, QObject, QRect, QSize, Qt, QThread, QTimer, Signal
