@@ -143,6 +143,7 @@ class ExportThread(QThread):
             Qt.AlignmentFlag.AlignHCenter
             | Qt.AlignmentFlag.AlignTop
             | Qt.TextFlag.TextWordWrap
+            | Qt.TextFlag.TextWrapAnywhere
         )
 
         # Pass 1: measure the tallest wrapped caption across all panels
