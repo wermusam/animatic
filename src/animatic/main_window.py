@@ -118,11 +118,12 @@ class ExportThread(QThread):
             panel.image_path = temp_path
 
     def _bake_notes_into_images(self) -> None:
-        """Paint panel notes onto images with QPainter before FFmpeg sees them.
+        """Append a caption strip below each panel image containing the notes.
 
-        Yellow text with a black outline, centered near the bottom, matching
-        the preview style. Replaces FFmpeg's drawtext filter so the export
-        does not depend on platform-specific font paths or filter syntax.
+        Creates a new image consisting of the original image on top and a
+        black strip below containing the notes in yellow, word-wrapped to
+        fit the image width. Matches the preview's layout (drawing on top,
+        yellow caption below) and ensures notes never cover the drawing.
 
         Only runs when burn_notes is True and the panel has non-empty notes.
         """
@@ -148,51 +149,63 @@ class ExportThread(QThread):
                 panel.image_path = temp_path
                 continue
 
-            image = QImage(panel.image_path)
-            if image.isNull():
+            src_image = QImage(panel.image_path)
+            if src_image.isNull():
                 continue
 
-            painter = QPainter(image)
-            painter.setRenderHint(QPainter.RenderHint.TextAntialiasing, True)
-            # Font size scales with image height so text is readable at any resolution
-            pt = max(24, int(image.height() / 28))
+            # Font size aims for ~2% of image height so text renders around
+            # 20pt in a 1080p output after FFmpeg scales to fit.
+            pt = max(16, int(src_image.height() / 50))
             font = QFont()
             font.setPointSize(pt)
             font.setBold(True)
-            painter.setFont(font)
 
-            # Word-wrap the notes into a rect that fits within image width minus margin,
-            # bottom-aligned. Matches the preview's QLabel.setWordWrap(True) behavior.
-            margin = max(20, int(image.width() * 0.05))
-            available_width = image.width() - 2 * margin
+            # Measure wrapped text height at the full image width minus margin
+            margin_x = max(20, int(src_image.width() * 0.03))
+            available_width = src_image.width() - 2 * margin_x
             text_flags = (
                 Qt.AlignmentFlag.AlignHCenter
-                | Qt.AlignmentFlag.AlignBottom
+                | Qt.AlignmentFlag.AlignTop
                 | Qt.TextFlag.TextWordWrap
             )
-            measure_rect = QRect(0, 0, available_width, image.height())
-            wrapped = painter.boundingRect(measure_rect, text_flags, panel.notes)
-            bottom_margin = max(40, int(image.height() / 20))
-            text_rect = QRect(
-                margin,
-                image.height() - bottom_margin - wrapped.height(),
-                available_width,
-                wrapped.height(),
+            measure_painter = QPainter(src_image)
+            measure_painter.setFont(font)
+            wrapped = measure_painter.boundingRect(
+                QRect(0, 0, available_width, src_image.height()),
+                text_flags,
+                panel.notes,
             )
+            measure_painter.end()
 
-            # Outline: draw text in black at 8 offset positions, then yellow on top
-            outline = max(2, pt // 12)
-            painter.setPen(QColor("black"))
-            for dx in (-outline, 0, outline):
-                for dy in (-outline, 0, outline):
-                    if dx == 0 and dy == 0:
-                        continue
-                    painter.drawText(text_rect.translated(dx, dy), text_flags, panel.notes)
+            strip_padding = max(20, int(pt * 0.6))
+            strip_height = wrapped.height() + strip_padding * 2
+
+            # Compose: original image on top, black caption strip below
+            new_image = QImage(
+                src_image.width(),
+                src_image.height() + strip_height,
+                QImage.Format.Format_RGB32,
+            )
+            new_image.fill(QColor("black"))
+
+            painter = QPainter(new_image)
+            painter.setRenderHint(QPainter.RenderHint.TextAntialiasing, True)
+            painter.drawImage(0, 0, src_image)
+            painter.setFont(font)
             painter.setPen(QColor("yellow"))
-            painter.drawText(text_rect, text_flags, panel.notes)
+            painter.drawText(
+                QRect(
+                    margin_x,
+                    src_image.height() + strip_padding,
+                    available_width,
+                    wrapped.height(),
+                ),
+                text_flags,
+                panel.notes,
+            )
             painter.end()
 
-            image.save(temp_path, "PNG")
+            new_image.save(temp_path, "PNG")
             panel.image_path = temp_path
 
     def run(self) -> None:
