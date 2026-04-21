@@ -158,8 +158,12 @@ class AnimaticEngine:
         """
         cmd: list[str] = [self.ffmpeg_exe, "-y"]
 
-        # Check if any panels have per-panel audio
-        has_per_panel_audio = any(p.audio_path for p in panels)
+        # Check if any panels have per-panel audio (validate each file first)
+        valid_audio: dict[int, str] = {}
+        for i, p in enumerate(panels):
+            if p.audio_path and self.get_audio_duration(p.audio_path) is not None:
+                valid_audio[i] = p.audio_path
+        has_per_panel_audio = len(valid_audio) > 0
 
         # Add inputs: image for each panel, then per-panel audio files
         input_idx = 0
@@ -172,9 +176,9 @@ class AnimaticEngine:
             input_idx += 1
 
         if has_per_panel_audio:
-            for i, panel in enumerate(panels):
-                if panel.audio_path:
-                    cmd.extend(["-i", panel.audio_path])
+            for i in range(len(panels)):
+                if i in valid_audio:
+                    cmd.extend(["-i", valid_audio[i]])
                     panel_audio_inputs[i] = input_idx
                     input_idx += 1
 
@@ -199,10 +203,10 @@ class AnimaticEngine:
             if has_per_panel_audio:
                 alabel = f"a{i}"
                 if i in panel_audio_inputs:
-                    # Trim audio to panel duration, then normalize loudness
                     aidx = panel_audio_inputs[i]
+                    dur = panels[i].duration
                     filter_parts.append(
-                        f"[{aidx}:a]atrim=0:{panel.duration},asetpts=PTS-STARTPTS,dynaudnorm[{alabel}]"
+                        f"[{aidx}:a]atrim=0:{dur},asetpts=PTS-STARTPTS,dynaudnorm[{alabel}]"
                     )
                 else:
                     # Generate silence for panels without audio
