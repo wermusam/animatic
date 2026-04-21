@@ -44,12 +44,8 @@ jobs:
           uv run pyinstaller --onefile --windowed --name ${{ matrix.name }} --paths src --collect-data imageio_ffmpeg --hidden-import imageio_ffmpeg --collect-all PySide6 main.py
 
       - name: Smoke test
-        run: |
-          if [ "${{ matrix.os }}" == "ubuntu-latest" ]; then
-            QT_QPA_PLATFORM=offscreen ./dist/${{ matrix.name }} --smoke-test
-          else
-            ./dist/${{ matrix.name }} --smoke-test
-          fi
+        if: matrix.os != 'ubuntu-latest'
+        run: ./dist/${{ matrix.name }} --smoke-test
         shell: bash
         timeout-minutes: 1
 
