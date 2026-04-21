@@ -65,6 +65,24 @@ class AnimaticEngine:
             pass
         return None
 
+    def _has_valid_audio(self, audio_path: str) -> bool:
+        cmd = [self.ffmpeg_exe, "-i", audio_path]
+        try:
+            startupinfo = None
+            if os.name == "nt":
+                startupinfo = subprocess.STARTUPINFO()
+                startupinfo.dwFlags |= subprocess.STARTF_USESHOWWINDOW
+            result = subprocess.run(
+                cmd,
+                capture_output=True,
+                text=True,
+                startupinfo=startupinfo,
+                stdin=subprocess.DEVNULL,
+            )
+            return "Audio:" in result.stderr
+        except (subprocess.SubprocessError, FileNotFoundError):
+            return False
+
     def generate_video(
         self,
         image_path: str,
@@ -161,7 +179,7 @@ class AnimaticEngine:
         # Check if any panels have per-panel audio (validate each file first)
         valid_audio: dict[int, str] = {}
         for i, p in enumerate(panels):
-            if p.audio_path and self.get_audio_duration(p.audio_path) is not None:
+            if p.audio_path and self._has_valid_audio(p.audio_path):
                 valid_audio[i] = p.audio_path
         has_per_panel_audio = len(valid_audio) > 0
 
