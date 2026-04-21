@@ -1629,6 +1629,8 @@ def main() -> None:
     app = QApplication(sys.argv)
     window = AnimaticCreator()
     window.show()
+    if "--smoke-test" in sys.argv:
+        QTimer.singleShot(3000, app.quit)
     sys.exit(app.exec())
 
 
