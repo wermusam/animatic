@@ -15,8 +15,6 @@ https://github.com/user-attachments/assets/309d7c3b-86cc-4dc7-ac87-e0fc7e94177a
 Click the link for your computer to download:
 
 * **[Download for Windows](https://github.com/wermusam/animatic/releases/latest/download/StoryboardAnimatic-Windows.exe)**
-* **[Download for Mac](https://github.com/wermusam/animatic/releases/latest/download/StoryboardAnimatic-Mac)**
-* **[Download for Linux](https://github.com/wermusam/animatic/releases/latest/download/StoryboardAnimatic-Linux)**
 
 No installation. Download and run.
 
