@@ -2,7 +2,7 @@
 
 A free, offline storyboard animatic tool. Drag in images, add voice lines, preview, and export an MP4 to share with your team.
 
-No subscriptions, no cloud, no account. Works on Windows, Mac, and Linux.
+No subscriptions, no cloud, no account. Works on Windows and Mac.
 
 ![Empty state](screenshots/storyboard_1.PNG)
 
@@ -15,10 +15,11 @@ https://github.com/user-attachments/assets/309d7c3b-86cc-4dc7-ac87-e0fc7e94177a
 Click the link for your computer to download:
 
 * **[Download for Windows](https://github.com/wermusam/animatic/releases/latest/download/StoryboardAnimatic-Windows.exe)**
+* **[Download for Mac](https://github.com/wermusam/animatic/releases/latest/download/StoryboardAnimatic-Mac.zip)** (unzip it, then double-click the app)
 
 No installation. Download and run.
 
-**Mac users:** On first run, Mac may block the file because it's not signed. Right click the file, then Open, then Open anyway.
+**Mac users:** The download is a `.zip`. Double-click it to unzip, then open the app. On first run macOS may block it because it's not signed: open **System Settings > Privacy & Security**, scroll down, and click **Open Anyway** (or right-click the app, choose Open, then Open Anyway).
 
 **Windows users:** Windows SmartScreen may warn that the publisher is unknown. Click "More info," then "Run anyway."
 
