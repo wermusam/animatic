@@ -54,6 +54,10 @@ jobs:
         if: runner.os == 'macOS'
         run: |
           uv run pyinstaller --windowed --name StoryboardAnimatic-Mac --paths src --collect-data imageio_ffmpeg --hidden-import imageio_ffmpeg --collect-all PySide6 main.py
+          # Declare microphone use (macOS silently blocks recording without it) + set a proper app id, then re-sign the edited bundle
+          /usr/libexec/PlistBuddy -c "Add :NSMicrophoneUsageDescription string Animatic records audio so you can add narration to your storyboard panels." "dist/StoryboardAnimatic-Mac.app/Contents/Info.plist"
+          /usr/libexec/PlistBuddy -c "Set :CFBundleIdentifier com.wermusam.animatic" "dist/StoryboardAnimatic-Mac.app/Contents/Info.plist"
+          codesign --force --deep --sign - "dist/StoryboardAnimatic-Mac.app"
           ditto -c -k --keepParent "dist/StoryboardAnimatic-Mac.app" "dist/StoryboardAnimatic-Mac.zip"
 
       - name: Smoke test (macOS)
