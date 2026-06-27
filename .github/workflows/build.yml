@@ -13,16 +13,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        include:
-          - os: windows-latest
-            name: StoryboardAnimatic-Windows.exe
-            separator: ";"
-          - os: macos-latest
-            name: StoryboardAnimatic-Mac
-            separator: ":"
-          - os: ubuntu-latest
-            name: StoryboardAnimatic-Linux
-            separator: ":"
+        os: [windows-latest, macos-latest]
 
     runs-on: ${{ matrix.os }}
 
@@ -39,21 +30,48 @@ jobs:
           uv sync
           uv add --dev pyinstaller
 
-      - name: Build
+      # Windows: one single .exe (unchanged)
+      - name: Build (Windows)
+        if: runner.os == 'Windows'
         run: |
-          uv run pyinstaller --onefile --windowed --name ${{ matrix.name }} --paths src --collect-data imageio_ffmpeg --hidden-import imageio_ffmpeg --collect-all PySide6 main.py
+          uv run pyinstaller --onefile --windowed --name StoryboardAnimatic-Windows.exe --paths src --collect-data imageio_ffmpeg --hidden-import imageio_ffmpeg --collect-all PySide6 main.py
 
-      - name: Smoke test
-        if: matrix.os != 'ubuntu-latest'
-        run: ./dist/${{ matrix.name }} --smoke-test
+      - name: Smoke test (Windows)
+        if: runner.os == 'Windows'
+        run: ./dist/StoryboardAnimatic-Windows.exe --smoke-test
         shell: bash
         timeout-minutes: 1
 
-      - name: Upload artifact
+      - name: Upload (Windows)
+        if: runner.os == 'Windows'
         uses: actions/upload-artifact@v4
         with:
-          name: ${{ matrix.name }}
-          path: dist/${{ matrix.name }}
+          name: StoryboardAnimatic-Windows.exe
+          path: dist/StoryboardAnimatic-Windows.exe
+
+      # macOS: a real double-clickable .app, zipped into one download
+      - name: Build (macOS)
+        if: runner.os == 'macOS'
+        run: |
+          uv run pyinstaller --windowed --name StoryboardAnimatic-Mac --paths src --collect-data imageio_ffmpeg --hidden-import imageio_ffmpeg --collect-all PySide6 main.py
+          # Declare microphone use (macOS silently blocks recording without it) + set a proper app id, then re-sign the edited bundle
+          /usr/libexec/PlistBuddy -c "Add :NSMicrophoneUsageDescription string Animatic records audio so you can add narration to your storyboard panels." "dist/StoryboardAnimatic-Mac.app/Contents/Info.plist"
+          /usr/libexec/PlistBuddy -c "Set :CFBundleIdentifier com.wermusam.animatic" "dist/StoryboardAnimatic-Mac.app/Contents/Info.plist"
+          codesign --force --deep --sign - "dist/StoryboardAnimatic-Mac.app"
+          ditto -c -k --keepParent "dist/StoryboardAnimatic-Mac.app" "dist/StoryboardAnimatic-Mac.zip"
+
+      - name: Smoke test (macOS)
+        if: runner.os == 'macOS'
+        run: ./dist/StoryboardAnimatic-Mac.app/Contents/MacOS/StoryboardAnimatic-Mac --smoke-test
+        shell: bash
+        timeout-minutes: 1
+
+      - name: Upload (macOS)
+        if: runner.os == 'macOS'
+        uses: actions/upload-artifact@v4
+        with:
+          name: StoryboardAnimatic-Mac.zip
+          path: dist/StoryboardAnimatic-Mac.zip
 
   release:
     needs: build
